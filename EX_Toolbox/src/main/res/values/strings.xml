@@ -339,6 +339,7 @@
     <string name="prefBackgroundImagePositionDefaultValue" translatable="false">FIT_CENTER</string>  <!-- DO NOT TRANSLATE -->
 
     <string name="prefCategoryDevicePageTitle">Device Preferences</string>
+    <string name="prefCategoryGeneralTitle">General Preferences</string>
     <string name="prefHapticFeedbackPageTitle">Haptic Feedback Preferences</string>
     <string name="prefActionBarPageTitle">Action bar Preferences</string>
 

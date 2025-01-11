@@ -334,9 +334,10 @@
     <string-array name="advancedPreferences" translatable="false">
         <!-- Device Preferences -->
         <item>prefLocale</item>
+        <item>prefCategoryHapticFeedbackScreen</item>
 
         <!-- Status Row Preferences -->
-        <!-- <item>prefCategoryThrottleStatusRow</item> -->
+        <!-- <item>prefCategoryActionBarRow</item> -->
 <!--        <item>show_emergency_stop_menu_preference</item>-->
         <!-- <item>show_layout_power_button_preference</item> -->
         <item>ClockDisplayTypePreference</item>
@@ -350,7 +351,11 @@
         <item>prefAllowMobileData</item>
         <item>prefConnectTimeoutMs</item>
         <item>prefSocketTimeoutMs</item>
+        <item>prefHeartbeatResponseFactor</item>
         <item>prefFeedbackOnDisconnect</item>
+
+        <!-- Servo Preferences -->
+        <item>prefCategoryServo</item>
     </string-array>
 
     <!-- no need to include the sub preference here if the whole PreferenceScreen is hidden-->

@@ -62,14 +62,6 @@
             android:title="@string/prefDoubleBackButtonToExitTitle"
             android:layout="@layout/checkbox_no_icon" />
 
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        android:key="prefCategoryThrottleAppearance"
-        android:title="@string/prefHapticFeedbackPageTitle"
-        android:layout="@layout/category_icon_left"
-        android:icon="@drawable/category_throttle_screen_black" >
-
         <PreferenceScreen
             android:icon="?attr/ed_folder_icon"
             android:key="prefCategoryHapticFeedbackScreen"
@@ -145,7 +137,7 @@
     </PreferenceCategory>
 
     <PreferenceCategory
-        android:key="prefCategoryThrottleStatusRow"
+        android:key="prefCategoryActionBarRow"
         android:title="@string/prefActionBarPageTitle"
         android:layout="@layout/category_icon_left"
         android:icon="@drawable/category_status_row_black">
@@ -345,7 +337,7 @@
         android:key="prefCategoryServo"
         android:title="@string/prefServoTitle"
         android:layout="@layout/category_icon_left"
-        android:icon="@drawable/category_connect_black" >
+        android:icon="@drawable/category_servo_black" >
 
         <EditTextPreference
             android:defaultValue="@string/prefServoDefaultVpinDefaultValue"
