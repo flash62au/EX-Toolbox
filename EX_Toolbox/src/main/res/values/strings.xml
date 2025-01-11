@@ -124,6 +124,18 @@
     <string name="prefDoubleBackButtonToExitTitle">Double Back button to Exit?</string>
     <string name="prefDoubleBackButtonToExitSummary">Pressing the Android \'Back\' button twice within 3 seconds on the \'Throttle\' or \'Connection\' screen will exit EX-Toolbox</string>
 
+    <string name="prefServoTitle">Servo Preferences</string>
+    <string name="prefServoDefaultVpinSummary">Default Servo Vpin at each startup</string>
+    <string name="prefServoDefaultVpinTitle">Default VPin</string>
+    <string name="prefServoDefaultVpinDefaultValue" translatable="false">100</string>  <!-- DO NOT TRANSLATE -->
+    <string name="prefServoDefaultThrowPositionSummary">Default Servo Throw Position at each startup</string>
+    <string name="prefServoDefaultThrowPositionTitle">Default Throw Position</string>
+    <string name="prefServoDefaultThrowPositionDefaultValue" translatable="false">409</string>  <!-- DO NOT TRANSLATE -->
+    <string name="prefServoDefaultClosePositionSummary">Default Servo Close Position at each startup</string>
+    <string name="prefServoDefaultClosePositionTitle">Default Close Position</string>
+    <string name="prefServoDefaultClosePositionDefaultValue" translatable="false">205</string>  <!-- DO NOT TRANSLATE -->
+
+
     <!--    <string name="prefScreenBrightnessDimTitle">Screen Dimming % Value</string>-->
 <!--    <string name="prefScreenBrightnessDimSummary">Brightness setting to use when dimming the screen (0%-99%). Disables Auto or Adaptive Brightness if set.</string>-->
 <!--    <string name="prefScreenBrightnessDimDefaultValue" translatable="false">"5"</string>  &lt;!&ndash; DO NOT TRANSLATE &ndash;&gt;-->

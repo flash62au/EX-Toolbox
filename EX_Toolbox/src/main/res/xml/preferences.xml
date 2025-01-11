@@ -269,6 +269,7 @@
         android:title="@string/prefConnectTitle"
         android:layout="@layout/category_icon_left"
         android:icon="@drawable/category_connect_black" >
+
         <EditTextPreference
             android:defaultValue="@string/prefMaximumRecentConnectionsDefaultValue"
             android:dialogTitle="@string/prefMaximumRecentConnectionsTitle"
@@ -336,6 +337,47 @@
             android:key="prefFeedbackWhenGoingToBackground"
             android:summary="@string/prefFeedbackWhenGoingToBackgroundSummary"
             android:title="@string/prefFeedbackWhenGoingToBackgroundTitle"
+            android:layout="@layout/checkbox_no_icon" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="prefCategoryServo"
+        android:title="@string/prefServoTitle"
+        android:layout="@layout/category_icon_left"
+        android:icon="@drawable/category_connect_black" >
+
+        <EditTextPreference
+            android:defaultValue="@string/prefServoDefaultVpinDefaultValue"
+            android:dialogTitle="@string/prefServoDefaultVpinTitle"
+            android:key="prefServoDefaultVpin"
+            android:maxLength="5"
+            android:inputType="number"
+            android:digits="0123456789"
+            android:summary="@string/prefServoDefaultVpinSummary"
+            android:title="@string/prefServoDefaultVpinTitle"
+            android:layout="@layout/checkbox_no_icon" />
+
+        <EditTextPreference
+            android:defaultValue="@string/prefServoDefaultThrowPositionDefaultValue"
+            android:dialogTitle="@string/prefServoDefaultThrowPositionTitle"
+            android:key="prefServoDefaultThrowPosition"
+            android:maxLength="3"
+            android:inputType="number"
+            android:digits="0123456789"
+            android:summary="@string/prefServoDefaultThrowPositionSummary"
+            android:title="@string/prefServoDefaultThrowPositionTitle"
+            android:layout="@layout/checkbox_no_icon" />
+
+        <EditTextPreference
+            android:defaultValue="@string/prefServoDefaultClosePositionDefaultValue"
+            android:dialogTitle="@string/prefServoDefaultClosePositionTitle"
+            android:key="prefServoDefaultClosePosition"
+            android:maxLength="3"
+            android:inputType="number"
+            android:digits="0123456789"
+            android:summary="@string/prefServoDefaultClosePositionSummary"
+            android:title="@string/prefServoDefaultClosePositionTitle"
             android:layout="@layout/checkbox_no_icon" />
 
     </PreferenceCategory>

@@ -76,6 +76,9 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 
 import dcc_ex.ex_toolbox.logviewer.ui.LogViewerActivity;
@@ -84,6 +87,7 @@ import dcc_ex.ex_toolbox.util.LocaleHelper;
 
 public class servos extends AppCompatActivity implements GestureOverlayView.OnGestureListener {
 
+    private static final Logger log = LoggerFactory.getLogger(servos.class);
     private threaded_application mainapp;  // hold pointer to mainapp
     private SharedPreferences prefs;
 
@@ -106,11 +110,17 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
 
     int activeServoButtonNo = 1;
 
+    // these can be overridden in the preferences
     static final String SERVO_VPIN_DEFAULT = "100";
     static final String SERVO_THROWN_POSITION_DEFAULT = "409";
     static final String SERVO_MID_POSITION_DEFAULT = "307";
     static final String SERVO_CLOSED_POSITION_DEFAULT = "205";
     static final String SERVO_ID_DEFAULT = "";
+
+    String prefServoDefaultVpin = SERVO_VPIN_DEFAULT;
+    String prefServoDefaultThrowPosition = SERVO_THROWN_POSITION_DEFAULT;
+    String prefServoDefaultMidPosition = SERVO_MID_POSITION_DEFAULT; // not a real preference
+    String prefServoDefaultClosePosition = SERVO_CLOSED_POSITION_DEFAULT;
 
     private String dccexServoId = SERVO_ID_DEFAULT;
     private Integer dccexServoIdValue = 0;
@@ -425,6 +435,8 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
         //put pointer to this activity's handler in main app's shared variable
         mainapp.servos_msg_handler = new servos_handler(Looper.getMainLooper());
 
+        getPreferences();
+
         dccExServoThrowButton = findViewById(R.id.ex_DccexServoThrowButton);
         servo_button_listener servo_throw_click_listener = new servo_button_listener(WHICH_THROWN_POSITION);
         dccExServoThrowButton.setOnClickListener(servo_throw_click_listener);
@@ -468,11 +480,10 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
             public void onTextChanged(CharSequence s, int start, int before, int count) { }
         });
 
-
         //-----------------------------------------
 
         etDccexServoVpinValue = findViewById(R.id.ex_DccexServoVpinValue);
-        etDccexServoVpinValue.setText(SERVO_VPIN_DEFAULT);
+        etDccexServoVpinValue.setText(prefServoDefaultVpin);
         etDccexServoVpinValue.addTextChangedListener(new TextWatcher() {
             public void afterTextChanged(Editable s) { readTextField(WHICH_VPIN); showHideButtons(); }
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -480,7 +491,7 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
         });
 
         etDccexServoClosedPositionValue = findViewById(R.id.ex_DccexServoClosedPositionValue);
-        etDccexServoClosedPositionValue.setText(SERVO_CLOSED_POSITION_DEFAULT);
+        etDccexServoClosedPositionValue.setText(prefServoDefaultClosePosition);
         etDccexServoClosedPositionValue.addTextChangedListener(new TextWatcher() {
             public void afterTextChanged(Editable s) { readTextField(WHICH_CLOSED_POSITION); showHideButtons(); }
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -488,7 +499,7 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
         });
 
         etDccexServoMidPositionValue = findViewById(R.id.ex_DccexServoMidPositionValue);
-        etDccexServoMidPositionValue.setText(SERVO_MID_POSITION_DEFAULT);
+        etDccexServoMidPositionValue.setText("");
 //        etDccexServoMidPositionValue.addTextChangedListener(new TextWatcher() {
 //            public void afterTextChanged(Editable s) { readTextField(WHICH_MID_POSITION); showHideButtons(); }
 //            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -496,7 +507,7 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
 //        });
 
         etDccexServoThrownPositionValue = findViewById(R.id.ex_DccexServoThrownPositionValue);
-        etDccexServoThrownPositionValue.setText(SERVO_THROWN_POSITION_DEFAULT);
+        etDccexServoThrownPositionValue.setText(prefServoDefaultThrowPosition);
         etDccexServoThrownPositionValue.addTextChangedListener(new TextWatcher() {
             public void afterTextChanged(Editable s) { readTextField(WHICH_THROWN_POSITION); showHideButtons();  }
             public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -568,6 +579,8 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
         clearCommandsButton.setOnClickListener(clearCommandsClickListener);
 
 
+        // Set the default values
+        resetServo();
 
         // Set the options for the saved servos
         mainapp.importExport.initialiseServoList();
@@ -603,6 +616,7 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
         super.onResume();
 
         mainapp.getCommonPreferences();
+        getPreferences();
 
         setActivityTitle();
         mainapp.activeScreen = mainapp.ACTIVE_SCREEN_SERVOS;
@@ -877,6 +891,14 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
 
 //**************************************************************************************
 
+    void getPreferences() {
+        prefServoDefaultVpin = prefs.getString("prefServoDefaultVpin", getResources().getString(R.string.prefServoDefaultVpinDefaultValue));
+        prefServoDefaultThrowPosition =  prefs.getString("prefServoDefaultThrowPosition", getResources().getString(R.string.prefServoDefaultThrowPositionDefaultValue));
+        prefServoDefaultClosePosition =  prefs.getString("prefServoDefaultClosePosition", getResources().getString(R.string.prefServoDefaultClosePositionDefaultValue));
+        Integer midPos = (Integer.parseInt(prefServoDefaultThrowPosition) - Integer.parseInt(prefServoDefaultClosePosition)) / 2 + Integer.parseInt(prefServoDefaultClosePosition);
+        prefServoDefaultMidPosition = midPos.toString();
+    }
+
     void showHideButtons() {
         boolean enable = true;
         if ( (dccexServoVpin.length()==0) || (dccexServoThrownPosition.length()==0) || (dccexServoMidPosition.length()==0) || (dccexServoClosedPosition.length()==0) ) {
@@ -1118,14 +1140,17 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
     }
 
     private void resetServo() {
-        dccexServoVpin = SERVO_VPIN_DEFAULT;
-        dccexServoVpinValue = Integer.parseInt(SERVO_VPIN_DEFAULT);
-        dccexServoThrownPosition = SERVO_THROWN_POSITION_DEFAULT;
-        dccexServoThrownPositionValue = Integer.parseInt(SERVO_THROWN_POSITION_DEFAULT);
-        dccexServoMidPosition = SERVO_MID_POSITION_DEFAULT;
-        dccexServoMidPositionValue = Integer.parseInt(SERVO_MID_POSITION_DEFAULT);
-        dccexServoClosedPosition = SERVO_CLOSED_POSITION_DEFAULT;
-        dccexServoClosedPositionValue = Integer.parseInt(SERVO_CLOSED_POSITION_DEFAULT);
+        dccexServoVpin = prefServoDefaultVpin;
+        dccexServoVpinValue = Integer.parseInt(prefServoDefaultVpin);
+        dccexServoThrownPosition = prefServoDefaultThrowPosition;
+        dccexServoThrownPositionValue = Integer.parseInt(prefServoDefaultThrowPosition);
+
+        dccexServoClosedPosition = prefServoDefaultClosePosition;
+        dccexServoClosedPositionValue = Integer.parseInt(prefServoDefaultClosePosition);
+
+        dccexServoMidPositionValue = (dccexServoThrownPositionValue - dccexServoClosedPositionValue) / 2 + dccexServoClosedPositionValue;
+        dccexServoMidPosition = dccexServoMidPositionValue.toString();
+        dccexServoMidPositionValue = Integer.parseInt(dccexServoMidPosition);
 
         etDccexServoVpinValue.setText(dccexServoVpin);
         etDccexServoClosedPositionValue.setText(dccexServoClosedPosition);
@@ -1265,27 +1290,27 @@ public class servos extends AppCompatActivity implements GestureOverlayView.OnGe
     private void resetTextField(int which) {
         switch (which) {
             case WHICH_VPIN:
-                dccexServoVpin = SERVO_VPIN_DEFAULT;
-                dccexServoVpinValue = Integer.parseInt(SERVO_VPIN_DEFAULT);
-                etDccexServoVpinValue.setText(SERVO_VPIN_DEFAULT);
+                dccexServoVpin = prefServoDefaultVpin;
+                dccexServoVpinValue = Integer.parseInt(prefServoDefaultVpin);
+                etDccexServoVpinValue.setText(prefServoDefaultVpin);
                 setExRailInstruction();
                 break;
             case WHICH_THROWN_POSITION:
-                dccexServoThrownPosition = SERVO_THROWN_POSITION_DEFAULT;
-                dccexServoThrownPositionValue = Integer.parseInt(SERVO_THROWN_POSITION_DEFAULT);
-                etDccexServoThrownPositionValue.setText(SERVO_THROWN_POSITION_DEFAULT);
+                dccexServoThrownPosition = prefServoDefaultThrowPosition;
+                dccexServoThrownPositionValue = Integer.parseInt(prefServoDefaultThrowPosition);
+                etDccexServoThrownPositionValue.setText(prefServoDefaultThrowPosition);
                 setExRailInstruction();
                 break;
             case WHICH_MID_POSITION:
-                dccexServoMidPosition = SERVO_MID_POSITION_DEFAULT;
-                dccexServoMidPositionValue = Integer.parseInt(SERVO_MID_POSITION_DEFAULT);
-                etDccexServoMidPositionValue.setText(SERVO_MID_POSITION_DEFAULT);
+                dccexServoMidPosition = prefServoDefaultMidPosition;
+                dccexServoMidPositionValue = Integer.parseInt(prefServoDefaultMidPosition);
+                etDccexServoMidPositionValue.setText(prefServoDefaultMidPosition);
                 setExRailInstruction();
                 break;
             case WHICH_CLOSED_POSITION:
-                dccexServoClosedPosition = SERVO_CLOSED_POSITION_DEFAULT;
-                dccexServoClosedPositionValue = Integer.parseInt(SERVO_CLOSED_POSITION_DEFAULT);
-                etDccexServoClosedPositionValue.setText(SERVO_CLOSED_POSITION_DEFAULT);
+                dccexServoClosedPosition = prefServoDefaultClosePosition;
+                dccexServoClosedPositionValue = Integer.parseInt(prefServoDefaultClosePosition);
+                etDccexServoClosedPositionValue.setText(prefServoDefaultClosePosition);
                 setExRailInstruction();
                 break;
             case WHICH_COMMAND:
