@@ -618,6 +618,7 @@ public class connection_activity extends AppCompatActivity implements Permission
         getConnectionsList();
 
         mainapp.setServerDescription("");
+
         set_labels();
         mainapp.cancelForcingFinish();            // if fresh start or restart after being killed in the bkg, indicate app is running again
         //start up server discovery listener again (after a 1 second delay)

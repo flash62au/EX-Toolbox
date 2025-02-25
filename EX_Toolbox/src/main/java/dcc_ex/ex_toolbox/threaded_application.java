@@ -193,6 +193,8 @@ public class threaded_application extends Application {
 
     public final static int DCCEX_MAX_SENSORS = 20;
     public int sensorDccexCount = 0;
+    public int prefSensorMaxCount = 100;
+    public boolean sensorMaxCountWarningGiven = false;
     public int [] sensorIdsDccex;  // used to process the sensor list
     public int [] sensorVpinsDccex;  // used to process the sensor list
     public int [] sensorPullupsDccex;  // used to process the sensor list
@@ -453,11 +455,6 @@ public class threaded_application extends Application {
 
         haveForcedWiFiConnection = false;
 
-        mainapp.sensorDccexCount =0;
-        mainapp.sensorIdsDccex = new int[100];
-        mainapp.sensorVpinsDccex = new int[100];
-        mainapp.sensorPullupsDccex = new int[100];
-
         //setup some legacy stuff from ED
         function_states[0] = new boolean[32];
 
@@ -480,7 +477,6 @@ public class threaded_application extends Application {
 
 
     } // end onCreate
-
 
     public class ApplicationLifecycleHandler implements Application.ActivityLifecycleCallbacks, ComponentCallbacks2 {
         private boolean isInBackground = true;
@@ -788,6 +784,12 @@ public class threaded_application extends Application {
         routeStringDccex = "";
 
         doFinish = false;
+
+        prefSensorMaxCount = getIntPrefValue(prefs, "prefSensorMaxCount", getResources().getString(R.string.prefSensorMaxCountDefaultValue));
+        sensorDccexCount = 0;
+        sensorIdsDccex = new int[prefSensorMaxCount];
+        sensorVpinsDccex = new int[prefSensorMaxCount];
+        sensorPullupsDccex = new int[prefSensorMaxCount];
     }
 
     //

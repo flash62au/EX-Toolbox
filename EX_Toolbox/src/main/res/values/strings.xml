@@ -135,6 +135,10 @@
     <string name="prefServoDefaultClosePositionTitle">Default Close Position</string>
     <string name="prefServoDefaultClosePositionDefaultValue" translatable="false">205</string>  <!-- DO NOT TRANSLATE -->
 
+    <string name="prefSensorTitle">Sensor Preferences</string>
+    <string name="prefSensorMaxCountSummary">Maximum number of Sensors to monitor and display.\nRequires a restart of EX-Toolbox if you change the value.</string>
+    <string name="prefSensorMaxCountTitle">Maximum Sensors</string>
+    <string name="prefSensorMaxCountDefaultValue" translatable="false">100</string>  <!-- DO NOT TRANSLATE -->
 
     <!--    <string name="prefScreenBrightnessDimTitle">Screen Dimming % Value</string>-->
 <!--    <string name="prefScreenBrightnessDimSummary">Brightness setting to use when dimming the screen (0%-99%). Disables Auto or Adaptive Brightness if set.</string>-->
@@ -264,6 +268,9 @@
     <string name="toastSaveLogFile">Logging Started in file %1$s. Logging will continue until you exit the EX-Toolbox app.</string>
     <string name="logViewerTitle">LogViewerActivity | %1$s</string>
     <string name="infoSaveLogFile">Logging to: %s</string>
+
+    <!--    Toast messages for the sensors -->
+    <string name="toastTooManySensors">Too many Sensors (%1$d). Increase preference to see remainder.</string>
 
     <string name="prefAllowMobileDataTitle">Mobile Data connection?</string>
     <string name="prefAllowMobileDataSummary">Allow your device to connect to JMRI over Mobile Data</string>

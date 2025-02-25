@@ -244,6 +244,7 @@ public class sensors extends AppCompatActivity implements GestureOverlayView.OnG
                 }
                 case message_type.RECEIVED_SENSOR: {
                     String s = msg.obj.toString();
+                    Log.d("EX_Toolbox", "sensors: RECEIVED_SENSOR: " + s);
                     if (s.length() > 0) {
                         String[] sArgs = s.split("(\\|)");
                         updateASensorListItem(sArgs[0], sArgs[1]);
@@ -255,6 +256,7 @@ public class sensors extends AppCompatActivity implements GestureOverlayView.OnG
                 }
                 case message_type.RECEIVED_ADDITIONAL_SENSOR: {
                     String s = msg.obj.toString();
+                    Log.d("EX_Toolbox", "sensors: RECEIVED_ADDITIONAL_SENSOR: " + s);
                     if (s.length() > 0) {
                         setIdsFromResponses();
                         refreshDccexSensorsView();
@@ -719,10 +721,16 @@ public class sensors extends AppCompatActivity implements GestureOverlayView.OnG
                 break;
             }
         }
-        if (entryExists==false) {                // sensor not in the list.  go get all the details again
-            mainapp.sendMsg(mainapp.comm_msg_handler, message_type.REQUEST_ALL_SENSOR_DETAILS);
-            sensors_list_adapter.notifyDataSetChanged();
-            sensorsListView.invalidateViews();
+        if (!entryExists) {                // sensor not in the list.  go get all the details again
+            if (mainapp.sensorDccexCount < mainapp.prefSensorMaxCount) { // as long as we are not already at max
+                if (!mainapp.sensorMaxCountWarningGiven) {
+                    mainapp.sensorMaxCountWarningGiven = true;
+                    mainapp.alert_activities(message_type.RECEIVED_ADDITIONAL_SENSOR, id);
+                }
+                mainapp.sendMsg(mainapp.comm_msg_handler, message_type.REQUEST_ALL_SENSOR_DETAILS);
+                sensors_list_adapter.notifyDataSetChanged();
+                sensorsListView.invalidateViews();
+            }
         }
     }
 
@@ -755,13 +763,14 @@ public class sensors extends AppCompatActivity implements GestureOverlayView.OnG
                 mainapp.sensorIdsDccex[i] = 0;
                 mainapp.sensorVpinsDccex[i] = 0;
                 mainapp.sensorPullupsDccex[i] = 0;
+                mainapp.sensorMaxCountWarningGiven = false;
             }
             mainapp.sensorDccexCount = 0;
 
             sensors_list_adapter.notifyDataSetChanged();
             sensorsListView.invalidateViews();
 
-            mainapp.sendMsg(mainapp.comm_msg_handler, message_type.REQUEST_ALL_SENSORS,"");
+//            mainapp.sendMsg(mainapp.comm_msg_handler, message_type.REQUEST_ALL_SENSORS,"");
             mainapp.hideSoftKeyboard(v);
 
             mainapp.sendMsgDelay(mainapp.comm_msg_handler, 1000, message_type.REQUEST_ALL_SENSOR_DETAILS);

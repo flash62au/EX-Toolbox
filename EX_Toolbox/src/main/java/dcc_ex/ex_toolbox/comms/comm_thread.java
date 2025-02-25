@@ -809,7 +809,7 @@ public class comm_thread extends Thread {
                         try {
                             vn = String.format("%02d.", Integer.parseInt(vn2[0]), Integer.parseInt(vn2[1]));
                         } catch (Exception e) {
-                            Log.d("Engine_Driver", "comm_thread.processWifiResponse: Invalid Version " + mainapp.DccexVersion + ", ignoring");
+                            Log.d("EX_Toolbox", "comm_thread.processWifiResponse: Invalid Version " + mainapp.DccexVersion + ", ignoring");
                         }
                         if (vn.length()>=2) {
                             try { vn = vn +String.format("%02d",Integer.parseInt(vn2[2]));
@@ -1086,11 +1086,16 @@ public class comm_thread extends Thread {
                 }
             }
             if (!found) {  // received a response from a sensor that was not in the list.  Request the full list again
-                mainapp.alert_activities(message_type.RECEIVED_ADDITIONAL_SENSOR,id);
+                if (mainapp.sensorDccexCount < mainapp.prefSensorMaxCount) { // as long as we are not already at max
+                    if (!mainapp.sensorMaxCountWarningGiven) {
+                        mainapp.sensorMaxCountWarningGiven = true;
+                        mainapp.alert_activities(message_type.RECEIVED_ADDITIONAL_SENSOR, id);
+                    }
+                }
+            } else {
+                mainapp.alert_activities(message_type.RECEIVED_SENSOR, id + "|" + ((active) ? "1" : "0"));  //send response to running activities
             }
         }
-
-        mainapp.alert_activities(message_type.RECEIVED_SENSOR, id + "|" + ((active) ? "1" : "0"));  //send response to running activities
     }
 
     private static void processDccexSensorDetailsResponse (String [] args) {
@@ -1118,12 +1123,17 @@ public class comm_thread extends Thread {
                     break;
                 }
             }
-            if (!found) {
+            if ( (!found) && (mainapp.sensorDccexCount < mainapp.prefSensorMaxCount) ) {
                 mainapp.sensorIdsDccex[mainapp.sensorDccexCount] = idValue;
                 mainapp.sensorVpinsDccex[mainapp.sensorDccexCount] = vpinValue;
                 mainapp.sensorPullupsDccex[mainapp.sensorDccexCount] = pullupValue;
                 mainapp.sensorDccexCount++;
                 mainapp.alert_activities(message_type.RECEIVED_ADDITIONAL_SENSOR,id);
+            } else {
+                if (!mainapp.sensorMaxCountWarningGiven) {
+                    mainapp.sensorMaxCountWarningGiven = true;
+                    threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastTooManySensors, mainapp.prefSensorMaxCount), Toast.LENGTH_LONG);
+                }
             }
         }
     }

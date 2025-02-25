@@ -375,6 +375,25 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:key="prefCategorySensor"
+        android:title="@string/prefSensorTitle"
+        android:layout="@layout/category_icon_left"
+        android:icon="@drawable/category_sensor_black" >
+
+    <EditTextPreference
+        android:defaultValue="@string/prefSensorMaxCountDefaultValue"
+        android:dialogTitle="@string/prefSensorMaxCountTitle"
+        android:key="prefSensorMaxCount"
+        android:maxLength="5"
+        android:inputType="number"
+        android:digits="0123456789"
+        android:summary="@string/prefSensorMaxCountSummary"
+        android:title="@string/prefSensorMaxCountTitle"
+        android:layout="@layout/checkbox_no_icon" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:key="prefCategoryImportExport"
         android:title="@string/prefThrottleImportExportTitle"
         android:layout="@layout/category_icon_left"
