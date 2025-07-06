@@ -1,6 +1,10 @@
-**Version 0.1.26
+**Version 0.1.28
+ * gradle update
+ * minimumSDK updated to 36
+**Version 0.1.27
  * Move to the AndroidX libraries
- * Minimum supported Android version increased to Android 5.0 (i.e. support for 4.1-4.4 dropped)
+ * Bug fix for more that 100 Sensors.  New preference to have more than 100 if needed
+**Version 0.1.26
  * Cleanup of the Power screen
  * Added 'swap' button on the Speed Trap page
  * Added 'Join' button on the Track Manager Page
