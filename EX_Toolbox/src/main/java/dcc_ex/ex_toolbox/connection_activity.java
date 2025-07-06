@@ -17,6 +17,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package dcc_ex.ex_toolbox;
 
+import static android.view.View.GONE;
+import static android.view.View.VISIBLE;
 import static dcc_ex.ex_toolbox.threaded_application.context;
 
 import android.annotation.SuppressLint;
@@ -26,6 +28,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -120,6 +123,7 @@ public class connection_activity extends AppCompatActivity implements Permission
     Button host_text;
 
     TextView discoveredServersHeading;
+    TextView discoveredServersWarning;
 
     LinearLayout rootView;
     int rootViewHeight = 0;
@@ -541,6 +545,7 @@ public class connection_activity extends AppCompatActivity implements Permission
         button.setOnClickListener(click_listener);
 
         discoveredServersHeading = findViewById(R.id.discoveredServersHeading);
+        discoveredServersWarning = findViewById(R.id.discoveredServersWarning);
 
         set_labels();
         DisplayMetrics dm = new DisplayMetrics();
@@ -677,7 +682,28 @@ public class connection_activity extends AppCompatActivity implements Permission
     private void set_labels() {
 
         String ssid = mainapp.client_ssid;
-        if ( (ssid.equals("UNKNOWN")) || (ssid.equals("<unknown ssid>")) ) ssid = getString(R.string.statusThreadedAppNotConnectedToWifi);
+        StringBuilder warningTextBuilder = new StringBuilder("");
+        if ( (ssid.equals("UNKNOWN")) || (ssid.equals("<unknown ssid>")) || (ssid.equals("Can't access SSID")) ) {
+            if (mainapp.client_type.equals("MOBILE")) {
+                ssid = getString(R.string.statusThreadedAppNotConnectedToWifi);
+            } else {
+                ssid = getString(R.string.statusThreadedAppNoLocationService);
+                if (!mainapp.clientLocationServiceEnabled) {
+                    warningTextBuilder.append(getString(R.string.statusThreadedAppServerDiscoveryNoLocationService));
+                    warningTextBuilder.append("  ");
+                }
+                PermissionsHelper phi = PermissionsHelper.getInstance();
+                if (!phi.isPermissionGranted(connection_activity.this, PermissionsHelper.ACCESS_FINE_LOCATION)) {
+                    warningTextBuilder.append(getString(R.string.statusThreadedAppServerDiscoveryAccessFineLocationNotGranted));
+                    warningTextBuilder.append("  ");
+                }
+                warningTextBuilder.append(getString(R.string.statusThreadedAppServerDiscoverySsidUnavailable));
+                discoveredServersWarning.setText(warningTextBuilder.toString());
+            }
+            discoveredServersWarning.setVisibility(VISIBLE);
+        } else {
+            discoveredServersWarning.setVisibility(GONE);
+        }
 
         discoveredServersHeading.setText(String.format(getString(R.string.discovered_services), ssid));
 
@@ -710,23 +736,32 @@ public class connection_activity extends AppCompatActivity implements Permission
             }
             //we must have location permissions to get SSID.
             PermissionsHelper phi = PermissionsHelper.getInstance();
-            if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                if (!phi.isPermissionGranted(connection_activity.this, PermissionsHelper.ACCESS_FINE_LOCATION)) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        phi.requestNecessaryPermissions(connection_activity.this, PermissionsHelper.ACCESS_FINE_LOCATION);
-                    }
-                }
-            } else {
-                if (!phi.isPermissionGranted(connection_activity.this, PermissionsHelper.NEARBY_WIFI_DEVICES)) {
-                    phi.requestNecessaryPermissions(connection_activity.this, PermissionsHelper.NEARBY_WIFI_DEVICES);
-                }
-            }
+//            if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+//                if (!phi.isPermissionGranted(connection_activity.this, PermissionsHelper.ACCESS_FINE_LOCATION)) {
+//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                        phi.requestNecessaryPermissions(connection_activity.this, PermissionsHelper.ACCESS_FINE_LOCATION);
+//                    }
+//                }
+//            } else {
+//                if (!phi.isPermissionGranted(connection_activity.this, PermissionsHelper.NEARBY_WIFI_DEVICES)) {
+//                    phi.requestNecessaryPermissions(connection_activity.this, PermissionsHelper.NEARBY_WIFI_DEVICES);
+//                }
+//            }
             prefAllowMobileData = prefs.getBoolean("prefAllowMobileData", false);
 
             mainapp.client_ssid = wifiinfo.getSSID();
             if (mainapp.client_ssid != null && mainapp.client_ssid.startsWith("\"") && mainapp.client_ssid.endsWith("\"")) {
                 mainapp.client_ssid = mainapp.client_ssid.substring(1, mainapp.client_ssid.length() - 1);
             }
+
+            // determine if the location service is enabled
+            LocationManager lm = (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
+            try {
+                mainapp.clientLocationServiceEnabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            } catch (Exception except) {
+                Log.d("Engine_Driver", "c_a: unable to determine if the location service is enabled");
+            }
+
             //determine if currently using mobile connection or wifi
             final ConnectivityManager cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo nInfo = cm.getActiveNetworkInfo();

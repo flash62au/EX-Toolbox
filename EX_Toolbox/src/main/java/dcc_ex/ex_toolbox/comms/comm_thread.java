@@ -807,12 +807,12 @@ public class comm_thread extends Thread {
                         String[] vn2 = vn1[1].split("\\.");
                         String vn = "4.";
                         try {
-                            vn = String.format("%02d.", Integer.parseInt(vn2[0]), Integer.parseInt(vn2[1]));
+                            vn = String.format("%02d.", Integer.parseInt(vn2[0]));
                         } catch (Exception e) {
                             Log.d("EX_Toolbox", "comm_thread.processWifiResponse: Invalid Version " + mainapp.DccexVersion + ", ignoring");
                         }
-                        if (vn.length()>=2) {
-                            try { vn = vn +String.format("%02d",Integer.parseInt(vn2[2]));
+                        if (vn2.length>=2) {
+                            try { vn = vn +String.format("%02d",Integer.parseInt(vn2[1]));
                             } catch (Exception ignored) {
                                 // try to pull a partial number
                                 String pn = "0";
@@ -824,7 +824,7 @@ public class comm_thread extends Thread {
                                 vn = vn +String.format("%03d", Integer.parseInt(pn));
                             }
                         }
-                        if (vn.length()>=3) {
+                        if (vn2.length>=3) {
                             try { vn = vn +String.format("%03d",Integer.parseInt(vn2[2]));
                             } catch (Exception ignored) {
                                 // try to pull a partial number

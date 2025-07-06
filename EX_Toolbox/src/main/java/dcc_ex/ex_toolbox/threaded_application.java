@@ -167,6 +167,7 @@ public class threaded_application extends Application {
     public Inet4Address client_address_inet4; //inet4 value of the client address
     public String client_ssid = "UNKNOWN";    //string of the connected SSID
     public String client_type = "UNKNOWN"; //network type, usually WIFI or MOBILE
+    public boolean clientLocationServiceEnabled = false;
 
     public HashMap<String, String> knownDccexServerIps = new HashMap<>();
     public boolean isDccex = true;  // is a DCC-EX EX-CommandStation
@@ -1691,11 +1692,6 @@ public class threaded_application extends Application {
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         }
-    }
-
-    public void hideSoftKeyboardAfterDialog() {
-        InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-        imm.toggleSoftInput(InputMethodManager.HIDE_IMPLICIT_ONLY, 0);
     }
 
     // get the consist for the specified throttle
