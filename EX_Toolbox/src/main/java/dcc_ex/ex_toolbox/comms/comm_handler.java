@@ -93,9 +93,10 @@ public class comm_handler extends Handler {
                            //log message, but keep going if this fails
                            Log.d("EX_Toolbox", "comm_handler.handleMessage: multicast_lock.acquire() failed");
                         }
-                        commThread.jmdns.addServiceListener(mainapp.JMDNS_SERVICE_WITHROTTLE, commThread.listener);
-//                        commThread.jmdns.addServiceListener("_dccex._tcp.local.", commThread.listener);
-                        commThread.jmdns.addServiceListener(mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, commThread.listener);
+                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, commThread.listener);
+                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, commThread.listener);
+                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, commThread.listener);
+                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, commThread.listener);
                         Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns listener added");
                      } else {
                         Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns not running, didn't start listener");
@@ -108,12 +109,14 @@ public class comm_handler extends Handler {
             break;
 
          //Connect to the WiThrottle server.
-         case message_type.CONNECT:
+         case message_type.CONNECT: {
 
-            //The IP address is stored in the obj as a String, the port is stored in arg1.
-            String new_host_ip = msg.obj.toString();
+            //The IP address, port and service type is stored in arg0.
+            String[] args = msg.obj.toString().split(" ");
+            String new_host_ip = args[0];
             new_host_ip = new_host_ip.trim();
-            int new_port = msg.arg1;
+            int new_port = Integer.parseInt(args[1]);
+            String new_serviceType = args[2];
 
             if (new_host_ip.equals("0.0.0.0")) { // USB OTG
 
@@ -146,6 +149,39 @@ public class comm_handler extends Handler {
                   mainapp.host_ip = null;  //clear vars if failed to connect
                   mainapp.port = 0;
                }
+
+            } else if (new_serviceType.equals(threaded_application.JMDNS_SERVICE_DCC_EX_UDP)) {
+
+               //avoid duplicate connects, seen when user clicks address multiple times quickly
+               if (comm_thread.socketUdp != null && comm_thread.socketUdp.SocketGood()
+                       && new_host_ip.equals(mainapp.host_ip) && new_port == mainapp.port) {
+                  Log.d("EX_Toolbox", "comm_handler.handleMessage: Duplicate CONNECT message received.");
+                  break;
+               }
+
+               //clear app.thread shared variables so they can be reinitialized
+               mainapp.initShared();
+               mainapp.fastClockSeconds = 0L;
+
+               //store ip and port in global variables
+               mainapp.host_ip = new_host_ip;
+               mainapp.port = new_port;
+               // skip url checking on Play Protect
+               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                  WebView.setSafeBrowsingWhitelist(Collections.singletonList(mainapp.host_ip), null);
+               }
+
+               //attempt connection to server
+               comm_thread.socketUdp = new SocketUdp(mainapp, prefs, commThread, mainapp.getBaseContext());
+               if (comm_thread.socketUdp.connect()) {
+
+                  commThread.sendThrottleName();
+                  mainapp.sendMsgDelay(mainapp.comm_msg_handler, 5000L, message_type.CONNECTION_COMPLETED_CHECK);
+               } else {
+                  mainapp.host_ip = null;  //clear vars if failed to connect
+                  mainapp.port = 0;
+               }
+
 
             } else {
 
@@ -182,11 +218,12 @@ public class comm_handler extends Handler {
             }
             break;
 
+         }
          //Release one or all locos on the specified throttle.  addr is in msg (""==all), arg1 holds whichThrottle.
          case message_type.RELEASE: {
             String addr = msg.obj.toString();
             final int whichThrottle = msg.arg1;
-            final boolean releaseAll = (addr.length() == 0);
+            final boolean releaseAll = (addr.isEmpty());
 
             if (releaseAll || mainapp.consists[whichThrottle].isEmpty()) {
                addr = "";

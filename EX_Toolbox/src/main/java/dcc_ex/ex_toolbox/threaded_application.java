@@ -97,6 +97,7 @@ import jmri.jmrit.roster.RosterEntry;
 //This thread will only act upon messages sent to it. The network communication needs to persist across activities, so that is why
 @SuppressLint("NewApi")
 public class threaded_application extends Application {
+    public static final String applicationName = "EX_Toolbox";
     public static String INTRO_VERSION = "10";  // set this to a different string to force the intro to run on next startup.
 
     private threaded_application mainapp = this;
@@ -111,8 +112,10 @@ public class threaded_application extends Application {
     public static int toolbarButtonCount = 0;
     private int initialToolbarHeight = -1;
 
-    public String JMDNS_SERVICE_WITHROTTLE = "_withrottle._tcp.local.";
-    public String JMDNS_SERVICE_JMRI_DCCPP_OVERTCP = "_dccppovertcpserver._tcp.local.";
+    public static final String JMDNS_SERVICE_WITHROTTLE = "_withrottle._tcp.local.";
+    public static final String JMDNS_SERVICE_JMRI_DCCPP_OVERTCP = "_dccppovertcpserver._tcp.local.";
+    public static final String JMDNS_SERVICE_DCC_EX_TCP = "_dcc-ex._tcp.local.";
+    public static final String JMDNS_SERVICE_DCC_EX_UDP = "_dcc-ex._udp.local.";
 
     public volatile String host_ip = null; //The IP address of the WiThrottle server.
     public volatile String logged_host_ip = null;
@@ -187,6 +190,7 @@ public class threaded_application extends Application {
     public boolean isDccex = true;  // is a DCC-EX EX-CommandStation
     public boolean isEsp32OrCsb1 = false;
     public boolean isUSB = false;
+    public boolean isUdp = false;
     public String dccexVersion = "";
     public double dccexVersionValue = 0.0;
     public static final double DCCEX_MIN_VERSION_FOR_TRACK_MANAGER = 04.02007;

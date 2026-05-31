@@ -54,6 +54,7 @@ public class comm_thread extends Thread {
 //    static socketWifi socketWiT;
     static SocketWiFi socketWiT;
     static SocketUsb socketUsb;
+    static SocketUdp socketUdp;
     static heartbeat heart = new heartbeat();
     private static long lastSentMs = System.currentTimeMillis();
     private static long lastQueuedMs = System.currentTimeMillis();
@@ -103,7 +104,7 @@ public class comm_thread extends Thread {
         }
 
         public void serviceResolved(ServiceEvent event) {
-            //          Log.d("EX_Toolbox", String.format("comm_thread.serviceResolved fired"));
+            Log.d("EX_Toolbox", String.format("comm_thread.serviceResolved(): '%s'", event.getName()));
             //A service's information has been resolved. Send the port and service name to connect to that service.
             int port = event.getInfo().getPort();
 
@@ -113,9 +114,14 @@ public class comm_thread extends Thread {
             }
 
             String host_name = event.getInfo().getName();
-            if (event.getInfo().getType().toString().equals(mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP)) {
+            if (event.getInfo().getType().equals(mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP)) {
                 host_name = host_name + " [DCC-EX]";
+            } else if (event.getInfo().getType().equals(mainapp.JMDNS_SERVICE_DCC_EX_TCP)) {
+                host_name = host_name + " [DCC-EX]";
+            } else if (event.getInfo().getType().equals(mainapp.JMDNS_SERVICE_DCC_EX_UDP)) {
+                host_name = host_name + " [UDP]";
             }
+
             Inet4Address[] ip_addresses = event.getInfo().getInet4Addresses();  //only get ipV4 address
             String ip_address = ip_addresses[0].toString().substring(1);  //use first one, since WiThrottle is only putting one in (for now), and remove leading slash
 
@@ -125,7 +131,7 @@ public class comm_thread extends Thread {
             hm.put("port", ((Integer) port).toString());
             hm.put("host_name", host_name);
             hm.put("ssid", mainapp.client_ssid);
-            hm.put("service_type", event.getInfo().getType().toString());
+            hm.put("service_type", event.getInfo().getType());
 
             String key = ""+ip_address+":"+port;
             mainapp.knownDccexServerIps.put(key, serverType);
@@ -182,8 +188,10 @@ public class comm_thread extends Thread {
             public void run() {
                 try {
                     Log.d("EX_Toolbox", "comm_thread.endJmdns: removing jmdns listener");
-                    jmdns.removeServiceListener(mainapp.JMDNS_SERVICE_WITHROTTLE, listener);
-                    jmdns.removeServiceListener(mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, listener);
+                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, listener);
+                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, listener);
+                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, listener);
+                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, listener);
 
                     multicast_lock.release();
                 } catch (Exception e) {
@@ -231,7 +239,7 @@ public class comm_thread extends Thread {
         hm.put("port", entryPort);
         hm.put("host_name", entryName);
         hm.put("ssid", mainapp.client_ssid);
-        hm.put("service_type",(serverType.equals("DCC-EX") ? mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP : mainapp.JMDNS_SERVICE_WITHROTTLE) );
+        hm.put("service_type",(serverType.equals("DCC-EX") ? threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP : threaded_application.JMDNS_SERVICE_WITHROTTLE) );
 
 //        mainapp.knownDCCEXserverIps.put(server_addr, serverType);
         String key = ""+server_addr+":"+entryPort;
@@ -296,9 +304,13 @@ public class comm_thread extends Thread {
 
     protected void shutdown(boolean fast) {
         Log.d("EX_Toolbox", "comm_thread.Shutdown");
-        if (!mainapp.isUSB) {
+        if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
             if (socketWiT != null) {
                 socketWiT.disconnect(true, fast);     //stop reading from the socket
+            }
+        } else if (mainapp.isUdp) {
+            if (socketUdp != null) {
+                socketUdp.disconnect(true, fast);     //stop reading from the socket
             }
         } else {
             if (socketUsb != null) {
@@ -328,6 +340,7 @@ public class comm_thread extends Thread {
         //DCC-EX // name is not relevant, so send a Command Station Status Request
 //        Log.d("EX_Toolbox", "comm_thread.sendThrottleName DCC-EX: <s>");
         if (mainapp.dccexListsRequested < 0) { // if we haven't received all the lists go ask for them
+            wifiSend("<#>");
             wifiSend("<s>");
             sendRequestRoster();
             sendRequestTurnouts();
@@ -1879,9 +1892,14 @@ public class comm_thread extends Thread {
             Log.d("EX_Toolbox", "comm_thread.wifiSend: --> null msg");
             return;
         } else {
-            if (!mainapp.isUSB) {
+            if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
                 if (socketWiT == null) {
                     Log.e("EX_Toolbox", "comm_thread.wifiSend: socketWiT is null, message '" + msg + "' not sent!");
+                    return;
+                }
+            } else if (mainapp.isUdp) {
+                if (socketUdp == null) {
+                    Log.e("EX_Toolbox", "comm_thread.wifiSend: socketUdp is null, message '" + msg + "' not sent!");
                     return;
                 }
             } else {
@@ -1900,8 +1918,10 @@ public class comm_thread extends Thread {
             //perform the 'send'
             Log.d("EX_Toolbox", "comm_thread.wifiSend: " + (mainapp.isDccex ? "DCC-EX" : "") + "           <:> -->:" + msg.replaceAll("\n", "\u21B5") + " (" + lastGap + ")"); //replace newline with cr arrow
             lastSentMs = now;
-            if (!mainapp.isUSB) {
+            if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
                 socketWiT.Send(msg);
+            } else if (mainapp.isUdp) {
+                socketUdp.Send(msg);
             } else {
                 socketUsb.Send(msg);
             }
@@ -2378,8 +2398,12 @@ public class comm_thread extends Thread {
                     // prior to JMRI 4.20 there were cases where WiT might not respond to
                     // speed and direction request.  If inboundTimeout handling is in progress
                     // then we always send the Throttle Name to ensure a response
-                    if (!mainapp.isUSB) {
+                    if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
                         if (!anySent || (mainapp.getServerType().isEmpty() && socketWiT.inboundTimeoutRecovery)) {
+                            sendThrottleName(false);    //send message that will get a response
+                        }
+                    } else if (mainapp.isUdp) {
+                        if (!anySent || (mainapp.getServerType().isEmpty() && socketUdp.inboundTimeoutRecovery)) {
                             sendThrottleName(false);    //send message that will get a response
                         }
                     } else {
@@ -2399,9 +2423,13 @@ public class comm_thread extends Thread {
             public void run() {
                 mainapp.comm_msg_handler.removeCallbacks(this); //remove pending requests
                 if (heartbeatIntervalSetpoint != 0) {
-                    if (!mainapp.isUSB) {
+                    if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
                         if (socketWiT != null && socketWiT.SocketGood()) {
                             socketWiT.InboundTimeout();
+                        }
+                    } else if (mainapp.isUdp) {
+                        if (socketUdp != null && socketUdp.SocketGood()) {
+                            socketUdp.InboundTimeout();
                         }
                     } else {
                         if (socketUsb != null && socketUsb.SocketGood()) {
