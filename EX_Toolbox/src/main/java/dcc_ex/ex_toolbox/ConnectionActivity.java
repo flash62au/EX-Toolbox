@@ -624,8 +624,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
         getWifiInfo();
 
         mainapp.setActivityOrientation(this);  //set screen orientation based on prefs
-        //start up server discovery listener
-        //	    sendMsgErr(0, message_type.SET_LISTENER, "", 1, "ERROR in ca.onResume: comm thread not started.") ;
+
         mainapp.sendMsg(mainapp.comm_msg_handler, message_type.SET_LISTENER, "", 1);
         //populate the ListView with the recent connections
         getConnectionsList();
@@ -637,7 +636,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
         //start up server discovery listener again (after a 1 second delay)
         //TODO: this is a rig, figure out why this is needed for ubuntu servers
         //	    sendMsgErr(1000, message_type.SET_LISTENER, "", 1, "ERROR in ca.onResume: comm thread not started.") ;
-        mainapp.sendMsg(mainapp.comm_msg_handler, message_type.SET_LISTENER, "", 1);
+        mainapp.sendMsgDelay(mainapp.comm_msg_handler, 1000L, message_type.SET_LISTENER, "", 1, 0);
 
         if (prefs.getBoolean("connect_to_first_server_preference", false)) {
             connectA();

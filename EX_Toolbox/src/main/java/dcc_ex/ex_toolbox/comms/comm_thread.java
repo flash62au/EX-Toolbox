@@ -47,9 +47,11 @@ import dcc_ex.ex_toolbox.type.message_type;
 import dcc_ex.ex_toolbox.threaded_application;
 
 public class comm_thread extends Thread {
+    public static final String activityName = "comm_thread";
+
     JmDNS jmdns = null;
     volatile boolean endingJmdns = false;
-    withrottle_listener listener;
+    WithrottleListener listener;
     android.net.wifi.WifiManager.MulticastLock multicast_lock;
 //    static socketWifi socketWiT;
     static SocketWiFi socketWiT;
@@ -84,15 +86,15 @@ public class comm_thread extends Thread {
     /* ******************************************************************************************** */
 
     //Listen for a WiThrottle service advertisement on the LAN.
-    public class withrottle_listener implements ServiceListener {
+    public class WithrottleListener implements ServiceListener {
 
         public void serviceAdded(ServiceEvent event) {
-            //          Log.d("EX_Toolbox", String.format("comm_thread.serviceAdded fired"));
+            //          Log.d(threaded_application.applicationName, activityName + ": " +  String.format("serviceAdded fired"));
             //A service has been added. If no details, ask for them
-            Log.d("EX_Toolbox", String.format("comm_thread.serviceAdded for '%s', Type='%s'", event.getName(), event.getType()));
+            Log.d(threaded_application.applicationName, activityName + ": " + String.format("serviceAdded for '%s', Type='%s'", event.getName(), event.getType()));
             ServiceInfo si = jmdns.getServiceInfo(event.getType(), event.getName(), 0);
             if (si == null || si.getPort() == 0) {
-                Log.d("EX_Toolbox", String.format("comm_thread.serviceAdded, requesting details: '%s', Type='%s'", event.getName(), event.getType()));
+                Log.d(threaded_application.applicationName, activityName + ": " + String.format("serviceAdded, requesting details: '%s', Type='%s'", event.getName(), event.getType()));
                 jmdns.requestServiceInfo(event.getType(), event.getName(), true, 1000);
             }
         }
@@ -100,11 +102,11 @@ public class comm_thread extends Thread {
         public void serviceRemoved(ServiceEvent event) {
             //Tell the UI thread to remove from the list of services available.
             mainapp.sendMsg(mainapp.connection_msg_handler, message_type.SERVICE_REMOVED, event.getName()); //send the service name to be removed
-            Log.d("EX_Toolbox", String.format("comm_thread.serviceRemoved: '%s'", event.getName()));
+            Log.d(threaded_application.applicationName, activityName + ": " + String.format("serviceRemoved: '%s'", event.getName()));
         }
 
         public void serviceResolved(ServiceEvent event) {
-            Log.d("EX_Toolbox", String.format("comm_thread.serviceResolved(): '%s'", event.getName()));
+            Log.d(threaded_application.applicationName, activityName + ": " + String.format("serviceResolved(): '%s'", event.getName()));
             //A service's information has been resolved. Send the port and service name to connect to that service.
             int port = event.getInfo().getPort();
 
@@ -113,14 +115,7 @@ public class comm_thread extends Thread {
                 serverType = "DCCEX";
             }
 
-            String host_name = event.getInfo().getName();
-            if (event.getInfo().getType().equals(mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP)) {
-                host_name = host_name + " [DCC-EX]";
-            } else if (event.getInfo().getType().equals(mainapp.JMDNS_SERVICE_DCC_EX_TCP)) {
-                host_name = host_name + " [DCC-EX]";
-            } else if (event.getInfo().getType().equals(mainapp.JMDNS_SERVICE_DCC_EX_UDP)) {
-                host_name = host_name + " [UDP]";
-            }
+            String host_name = modifyHostName(event.getInfo().getName(), event.getInfo().getType());
 
             Inet4Address[] ip_addresses = event.getInfo().getInet4Addresses();  //only get ipV4 address
             String ip_address = ip_addresses[0].toString().substring(1);  //use first one, since WiThrottle is only putting one in (for now), and remove leading slash
@@ -148,10 +143,25 @@ public class comm_thread extends Thread {
             if (!sent)
                 service_message.recycle();
 
-            Log.d("EX_Toolbox", String.format("comm_thread.serviceResolved - %s(%s):%d -- %s",
+            Log.d(threaded_application.applicationName, activityName + ": " + String.format("serviceResolved - %s(%s):%d -- %s",
                     host_name, ip_address, port, event.toString().replace(System.getProperty("line.separator"), " ")));
 
         }
+    }
+
+    String modifyHostName(String hostName, String serviceType) {
+        String resultHostName;
+        resultHostName = switch (serviceType) {
+            case threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP ->
+                    hostName + " [JMRI DCC-EX]";
+            case threaded_application.JMDNS_SERVICE_DCC_EX_TCP ->
+                    hostName + " [TCP DCC-EX]";
+            case threaded_application.JMDNS_SERVICE_DCC_EX_UDP ->
+                    hostName + " [UDP DCC-EX]";
+            default ->
+                    hostName;
+        };
+        return resultHostName;
     }
 
     void startJmdns() {
@@ -165,62 +175,79 @@ public class comm_thread extends Thread {
                     multicast_lock.setReferenceCounted(true);
                 }
 
-                Log.d("EX_Toolbox", "comm_thread.startJmdns: local IP addr " + mainapp.client_address);
+                Log.d(threaded_application.applicationName, activityName + ": startJmdns: local IP addr " + mainapp.client_address);
 
-                jmdns = JmDNS.create(mainapp.client_address_inet4, mainapp.client_address);  //pass ip as name to avoid hostname lookup attempt
+                // pass ip + timestamp as name to avoid hostname lookup attempt and conflict with lingering previous instances
+                jmdns = JmDNS.create(mainapp.client_address_inet4, mainapp.client_address + "-" + System.currentTimeMillis());
 
-                listener = new withrottle_listener();
-                Log.d("EX_Toolbox", "comm_thread.startJmdns: listener created");
+                listener = new WithrottleListener();
+                Log.d(threaded_application.applicationName, activityName + ": startJmdns: listener created");
 
             } else {
                 threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppNoLocalIp), Toast.LENGTH_LONG);
             }
         } catch (Exception except) {
-            Log.e("EX_Toolbox", "comm_thread.startJmdns - Error creating withrottle listener: " + except.getMessage());
+            Log.d(threaded_application.applicationName, activityName + ": startJmdns - Error creating withrottle listener: " + except.getMessage());
             threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppErrorCreatingWiThrottle, except.getMessage()), Toast.LENGTH_SHORT);
         }
     }
 
     //endJmdns() takes a long time, so put it in its own thread
     void endJmdns() {
+        if (!jmdnsIsActive()) {      //only need to run one instance of this thread to terminate jmdns
+            Log.d(threaded_application.applicationName, activityName + ": endJmdns(): not active");
+            return;
+        }
+
+        final JmDNS localJmdns = jmdns;
+        final WithrottleListener localListener = listener;
+        final android.net.wifi.WifiManager.MulticastLock localLock = multicast_lock;
+
+        jmdns = null; // Set to null immediately so a new one can be started if needed
+        multicast_lock = null;
+        listener = null;
+        endingJmdns = true;
+
         Thread jmdnsThread = new Thread("EndJmdns") {
             @Override
             public void run() {
                 try {
-                    Log.d("EX_Toolbox", "comm_thread.endJmdns: removing jmdns listener");
-                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, listener);
-                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, listener);
-                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, listener);
-                    jmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, listener);
+                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: removing jmdns listener");
+                    localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, localListener);
+                    localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, localListener);
+                    localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, localListener);
+                    localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, localListener);
 
-                    multicast_lock.release();
+                    if (localLock != null && localLock.isHeld()) {
+                        localLock.release();
+                    }
                 } catch (Exception e) {
-                    Log.d("EX_Toolbox", "comm_thread.endJmdns: exception in jmdns.removeServiceListener()");
+                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: exception in jmdns.removeServiceListener()");
                 }
                 try {
-                    Log.d("EX_Toolbox", "comm_thread.endJmdns: calling jmdns.close()");
-                    jmdns.close();
-                    Log.d("EX_Toolbox", "comm_thread.endJmdns: after jmdns.close()");
+                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: calling jmdns.close()");
+                    localJmdns.close();
+                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: after jmdns.close()");
                 } catch (Exception e) {
-                    Log.d("EX_Toolbox", "comm_thread.endJmdns: exception in jmdns.close()");
+                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: exception in jmdns.close()");
+                } finally {
+                    endingJmdns = false;
                 }
-                jmdns = null;
-                endingJmdns = false;
-                Log.d("EX_Toolbox", "comm_thread.endJmdns run exit");
+                Log.d(threaded_application.applicationName, activityName + ": endJmdns run exit");
             }
         };
         if (jmdnsIsActive()) {      //only need to run one instance of this thread to terminate jmdns
             endingJmdns = true;
             jmdnsThread.start();
-            Log.d("EX_Toolbox", "comm_thread.endJmdns active so ending it and starting thread to remove listener");
+            Log.d(threaded_application.applicationName, activityName + ": endJmdns active so ending it and starting thread to remove listener");
         } else {
 //            jmdnsThread = null;
-            Log.d("EX_Toolbox", "comm_thread.endJmdns not active");
+            Log.d(threaded_application.applicationName, activityName + ": endJmdns not active");
         }
     }
 
     boolean jmdnsIsActive() {
-        return jmdns != null && !endingJmdns;
+        return jmdns != null;
     }
 
     /*
@@ -257,7 +284,7 @@ public class comm_thread extends Thread {
         if (!sent)
             service_message.recycle();
 
-        Log.d("EX_Toolbox", String.format("comm_thread.addFakeDiscoveredServer: added '%s' at %s to Discovered List", entryName, server_addr));
+        Log.d(threaded_application.applicationName, activityName + ": " + String.format("addFakeDiscoveredServer: added '%s' at %s to Discovered List", entryName, server_addr));
 
     }
 
@@ -271,7 +298,7 @@ public class comm_thread extends Thread {
         hm.put("port", serverPort);
         hm.put("host_name", entryName);
         hm.put("ssid", mainapp.client_ssid);
-        hm.put("service_type", mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP);
+        hm.put("service_type", threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP);
 
 //        mainapp.knownDCCEXserverIps.put(server_addr, serverType);
         String key = serverAddress + ":" + serverPort;
@@ -289,7 +316,7 @@ public class comm_thread extends Thread {
         if (!sent)
             service_message.recycle();
 
-        Log.d("EX_Toolbox", String.format("comm_thread.addFakeUsbServer: added '%s' at %s to Discovered List", entryName, serverAddress));
+        Log.d(threaded_application.applicationName, activityName + ": " + String.format("addFakeUsbServer: added '%s' at %s to Discovered List", entryName, serverAddress));
 
     }
 
@@ -303,7 +330,7 @@ public class comm_thread extends Thread {
     }
 
     protected void shutdown(boolean fast) {
-        Log.d("EX_Toolbox", "comm_thread.Shutdown");
+        Log.d(threaded_application.applicationName, activityName + ": Shutdown");
         if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
             if (socketWiT != null) {
                 socketWiT.disconnect(true, fast);     //stop reading from the socket
@@ -317,7 +344,7 @@ public class comm_thread extends Thread {
                 socketUsb.disconnect(true, fast);     //stop reading from the socket
             }
         }
-        Log.d("EX_Toolbox", "comm_thread.Shutdown: socketWit down");
+        Log.d(threaded_application.applicationName, activityName + ": Shutdown: socketWit down");
         mainapp.host_ip = null;
         mainapp.port = 0;
         threaded_application.reinitStatics();                    // ensure activities are ready for relaunch
@@ -326,7 +353,7 @@ public class comm_thread extends Thread {
 //        threaded_application.dlRosterTask.stop();
 //            dlMetadataTask.stop();
 
-        Log.d("EX_Toolbox", "comm_thread.Shutdown finished");
+        Log.d(threaded_application.applicationName, activityName + ": Shutdown finished");
     }
 
     /* ******************************************************************************************** */
@@ -338,7 +365,7 @@ public class comm_thread extends Thread {
 
     private static void sendThrottleName(Boolean sendHWID) {
         //DCC-EX // name is not relevant, so send a Command Station Status Request
-//        Log.d("EX_Toolbox", "comm_thread.sendThrottleName DCC-EX: <s>");
+//        Log.d(threaded_application.applicationName, activityName + ": sendThrottleName DCC-EX: <s>");
         if (mainapp.dccexListsRequested < 0) { // if we haven't received all the lists go ask for them
             wifiSend("<#>");
             wifiSend("<s>");
@@ -391,7 +418,7 @@ public class comm_thread extends Thread {
             wifiSend("<R>");
         }
 
-//            Log.d("EX_Toolbox", "comm_thread.sendAcquireLoco DCC-EX: " + msgTxt);
+//            Log.d(threaded_application.applicationName, activityName + ": sendAcquireLoco DCC-EX: " + msgTxt);
     }
 
     protected static void sendRequestRosterLocoDetails(String addr) {
@@ -408,7 +435,7 @@ public class comm_thread extends Thread {
     protected void sendEStop(int whichThrottle) {
         //DCC-EX
         wifiSend("<!>");
-//        Log.d("EX_Toolbox", "comm_thread.sendEStop DCC-EX: ");
+//        Log.d(threaded_application.applicationName, activityName + ": sendEStop DCC-EX: ");
     }
 
     protected void sendDisconnect() {
@@ -468,12 +495,12 @@ public class comm_thread extends Thread {
                 for (Consist.ConLoco l : con.getLocos()) {
                     msgTxt = String.format("<F %s %d %d>", l.getAddress().substring(1, l.getAddress().length()), fn, newfState);
                     wifiSend(msgTxt);
-//                        Log.d("EX_Toolbox", "comm_thread.sendSpeed DCC-EX: " + msgTxt);
+//                        Log.d(threaded_application.applicationName, activityName + ": sendSpeed DCC-EX: " + msgTxt);
                 }
             } else { // just one address
                 msgTxt = String.format("<F %s %d %d>", addr.substring(1, addr.length()), fn, newfState);
                 wifiSend(msgTxt);
-//                    Log.d("EX_Toolbox", "comm_thread.sendFunction DCC-EX: " + msgTxt);
+//                    Log.d(threaded_application.applicationName, activityName + ": sendFunction DCC-EX: " + msgTxt);
             }
         }
     }
@@ -520,26 +547,26 @@ public class comm_thread extends Thread {
     protected static void sendRequestRoster() {
         String msgTxt = "<JR>";
         wifiSend(msgTxt);
-//         Log.d("EX_Toolbox", "comm_thread.sendRequestRoster DCC-EX: " + msgTxt);
+//         Log.d(threaded_application.applicationName, activityName + ": sendRequestRoster DCC-EX: " + msgTxt);
     }
 
     protected static void sendRequestTurnouts() {
         String msgTxt = "<JT>";
         wifiSend(msgTxt);
-//         Log.d("EX_Toolbox", "comm_thread.sendRequestTurnouts DCC-EX: " + msgTxt);
+//         Log.d(threaded_application.applicationName, activityName + ": sendRequestTurnouts DCC-EX: " + msgTxt);
     }
 
     protected static void sendRequestRoutes() {
         String msgTxt = "<JA>";
         wifiSend(msgTxt);
-//         Log.d("EX_Toolbox", "comm_thread.sendRequestRoutes DCC-EX: " + msgTxt);
+//         Log.d(threaded_application.applicationName, activityName + ": sendRequestRoutes DCC-EX: " + msgTxt);
     }
 
     protected static void sendRequestTracks() {
         if (mainapp.dccexVersionValue >= threaded_application.DCCEX_MIN_VERSION_FOR_TRACK_MANAGER) {  /// need to remove the track manager option
             String msgTxt = "<=>";
             wifiSend(msgTxt);
-//            Log.d("EX_Toolbox", "comm_thread.sendRequestTracks DCC-EX: " + msgTxt);
+//            Log.d(threaded_application.applicationName, activityName + ": sendRequestTracks DCC-EX: " + msgTxt);
         }
     }
 
@@ -566,7 +593,7 @@ public class comm_thread extends Thread {
             msgTxt = msgTxt + "<= " + track + " "+ type + " " + id + ">";
             wifiSend(msgTxt);
         }
-//         Log.d("EX_Toolbox", "comm_thread.sendTracks DCC-EX: " + msgTxt);
+//         Log.d(threaded_application.applicationName, activityName + ": sendTracks DCC-EX: " + msgTxt);
     }
 
     protected static void joinTracks() {
@@ -586,35 +613,35 @@ public class comm_thread extends Thread {
         String msgTxt;
         msgTxt = "<S>";
         wifiSend(msgTxt);
-        Log.d("EX_Toolbox", "comm_thread.sendAllSensorDetailsRequest DCC-EX: " + msgTxt);
+        Log.d(threaded_application.applicationName, activityName + ": sendAllSensorDetailsRequest DCC-EX: " + msgTxt);
     }
 
     static void sendSensorRequest(String id, String vpin, String pullup){
         String msgTxt;
         msgTxt = "<S " + id + " " + vpin + " " + pullup +" >";
         wifiSend(msgTxt);
-        Log.d("EX_Toolbox", "comm_thread.sendSensorRequest DCC-EX: " + msgTxt);
+        Log.d(threaded_application.applicationName, activityName + ": sendSensorRequest DCC-EX: " + msgTxt);
     }
 
     static void sendAllSensorsRequest(){
         String msgTxt;
         msgTxt = "<Q>";
         wifiSend(msgTxt);
-        Log.d("EX_Toolbox", "comm_thread.sendSensorRequest DCC-EX: " + msgTxt);
+        Log.d(threaded_application.applicationName, activityName + ": sendSensorRequest DCC-EX: " + msgTxt);
     }
 
     static void sendMoveServo(String cmd) {
         String msgTxt;
         msgTxt = "<D SERVO " + cmd + ">";
         wifiSend(msgTxt);
-        Log.d("EX_Toolbox", "comm_thread.sendMoveServo DCC-EX: " + msgTxt);
+        Log.d(threaded_application.applicationName, activityName + ": sendMoveServo DCC-EX: " + msgTxt);
     }
 
     static void sendServoDetailsRequest(String cmd) {
         String msgTxt;
         msgTxt = "<T " + cmd + " X>";
         wifiSend(msgTxt);
-        Log.d("EX_Toolbox", "comm_thread.sendServoDetailsRequest DCC-EX: " + msgTxt);
+        Log.d(threaded_application.applicationName, activityName + ": sendServoDetailsRequest DCC-EX: " + msgTxt);
     }
 
     protected static void sendRequestCurrents() {
@@ -645,7 +672,7 @@ public class comm_thread extends Thread {
         }
         String msgTxt = "<T " + cmd.substring(1) + " " + translatedState + ">";              // format <T id 0|1|T|C>
         wifiSend(msgTxt);
-//            Log.d("EX_Toolbox", "comm_thread.sendTurnout DCC-EX: " + msgTxt);
+//            Log.d(threaded_application.applicationName, activityName + ": sendTurnout DCC-EX: " + msgTxt);
     }
 
     protected void sendRoute(String cmd) {
@@ -673,7 +700,7 @@ public class comm_thread extends Thread {
         }
         msgTxt = msgTxt + " " + systemName + ">";
         wifiSend(msgTxt);
-//            Log.d("EX_Toolbox", "comm_thread.sendRoute DCC-EX: " + msgTxt);
+//            Log.d(threaded_application.applicationName, activityName + ": sendRoute DCC-EX: " + msgTxt);
     }
 
     @SuppressLint("DefaultLocale")
@@ -681,7 +708,7 @@ public class comm_thread extends Thread {
         //DCC-EX
         String msgTxt = String.format("<%d>", pState);
         wifiSend(msgTxt);
-//            Log.d("EX_Toolbox", "comm_thread.sendPower DCC-EX: " + msgTxt);
+//            Log.d(threaded_application.applicationName, activityName + ": sendPower DCC-EX: " + msgTxt);
     }
 
     @SuppressLint("DefaultLocale")
@@ -708,7 +735,7 @@ public class comm_thread extends Thread {
         //DCC-EX
         heart.setHeartbeatSent(true);
         wifiSend("<#>"); // DCC-EX doesn't have heartbeat, so sending a command with a simple response
-//            Log.d("EX_Toolbox", "comm_thread.sendHeartbeatStart DCC-EX: <#>)");
+//            Log.d(threaded_application.applicationName, activityName + ": sendHeartbeatStart DCC-EX: <#>)");
     }
 
     @SuppressLint("DefaultLocale")
@@ -723,13 +750,13 @@ public class comm_thread extends Thread {
                 msgTxt = String.format("<t 0 %s %d %d>", l.getAddress().substring(1), mainapp.lastKnownSpeedDCCEX[whichThrottle], newDir);
                 wifiSend(msgTxt);
                 mainapp.lastKnownDirDccex[whichThrottle] = newDir;
-//                    Log.d("EX_Toolbox", "comm_thread.sendSpeed DCC-EX: " + msgTxt);
+//                    Log.d(threaded_application.applicationName, activityName + ": sendSpeed DCC-EX: " + msgTxt);
             }
         } else {
             msgTxt = String.format("<t 0 %s %d %d>", addr.substring(1), mainapp.lastKnownSpeedDCCEX[whichThrottle], dir);
             wifiSend(msgTxt);
             mainapp.lastKnownDirDccex[whichThrottle] = dir;
-//                Log.d("EX_Toolbox", "comm_thread.sendDirection DCC-EX: " + msgTxt);
+//                Log.d(threaded_application.applicationName, activityName + ": sendDirection DCC-EX: " + msgTxt);
         }
     }
 
@@ -748,7 +775,7 @@ public class comm_thread extends Thread {
             if (l.isBackward()) newDir = (dir == 0) ? 1 : 0;
             msgTxt = String.format("<t 0 %s %d %d>", l.getAddress().substring(1), speed, newDir);
             wifiSend(msgTxt);
-//                Log.d("EX_Toolbox", "comm_thread.sendSpeed DCC-EX: " + msgTxt);
+//                Log.d(threaded_application.applicationName, activityName + ": sendSpeed DCC-EX: " + msgTxt);
         }
     }
 
@@ -757,7 +784,7 @@ public class comm_thread extends Thread {
         //DCC-EX
         String msgTxt = String.format("<t 0 %d %d %d>", locoAddr, speed, dir);
         wifiSend(msgTxt);
-//                Log.d("EX_Toolbox", "comm_thread.setSpeedDirect DCC-EX: " + msgTxt);
+//                Log.d(threaded_application.applicationName, activityName + ": setSpeedDirect DCC-EX: " + msgTxt);
     }
 
     @SuppressLint("DefaultLocale")
@@ -768,7 +795,7 @@ public class comm_thread extends Thread {
         for (Consist.ConLoco l : con.getLocos()) {
             msgTxt = String.format("<t %s>", l.getAddress().substring(1));
             wifiSend(msgTxt);
-//                Log.d("EX_Toolbox", "comm_thread.sendRequestSpeedAndDir DCC-EX: " + msgTxt);
+//                Log.d(threaded_application.applicationName, activityName + ": sendRequestSpeedAndDir DCC-EX: " + msgTxt);
         }
     }
 
@@ -836,7 +863,7 @@ public class comm_thread extends Thread {
     protected static void processWifiResponse(String responseStr) {
 
         //send response to debug log for review
-        Log.d("EX_Toolbox", "comm_thread.processWifiResponse: " + (mainapp.isDccex ? "DCC-EX" : "") + "<:> <--:" + responseStr);
+        Log.d(threaded_application.applicationName, activityName + ": processWifiResponse: " + (mainapp.isDccex ? "DCC-EX" : "") + "<:> <--:" + responseStr);
 
         boolean skipAlert = false;          //set to true if the Activities do not need to be Alerted
 
@@ -866,7 +893,7 @@ public class comm_thread extends Thread {
                         try {
                             vn = String.format("%02d.", Integer.parseInt(vn2[0]));
                         } catch (Exception e) {
-                            Log.d("EX_Toolbox", "comm_thread.processWifiResponse: Invalid Version " + mainapp.dccexVersion + ", ignoring");
+                            Log.d(threaded_application.applicationName, activityName + ": processWifiResponse: Invalid Version " + mainapp.dccexVersion + ", ignoring");
                         }
                         if (vn2.length>=2) {
                             try { vn = vn +String.format("%02d",Integer.parseInt(vn2[1]));
@@ -903,7 +930,7 @@ public class comm_thread extends Thread {
                         if (!mainapp.dccexVersion.equals(old_vn)) { //only if changed
                             mainapp.sendMsg(mainapp.connection_msg_handler, message_type.CONNECTED);
                         } else {
-                            Log.d("EX_Toolbox", "comm_thread.processWifiResponse: version already set to " + mainapp.dccexVersion + ", ignoring");
+                            Log.d(threaded_application.applicationName, activityName + ": processWifiResponse: version already set to " + mainapp.dccexVersion + ", ignoring");
                         }
 
                         mainapp.isEsp32OrCsb1 = ( (args[3].equals("ESP32")) || (args[5].contains("CSB1")) );
@@ -1454,7 +1481,7 @@ public class comm_thread extends Thread {
                             processRosterList(mainapp.rosterStringDccex);
                             mainapp.rosterStringDccex = "";
                             mainapp.dccexListsRequested++;
-                            Log.d("EX_Toolbox", "comm_thread.processDccexRoster: Roster complete. Count: " + mainapp.dccexListsRequested);
+                            Log.d(threaded_application.applicationName, activityName + ": processDccexRoster: Roster complete. Count: " + mainapp.dccexListsRequested);
                         }
                     }
 
@@ -1533,13 +1560,13 @@ public class comm_thread extends Thread {
                     mainapp.dccexListsRequested++;
 
                     int count = (mainapp.turnoutIDsDccex==null) ? 0 : mainapp.turnoutIDsDccex.length;
-                    Log.d("EX_Toolbox", "comm_thread.processDccexTurnouts: Turnouts complete. Count: " + count);
+                    Log.d(threaded_application.applicationName, activityName + ": processDccexTurnouts: Turnouts complete. Count: " + count);
                     mainapp.turnoutsBeingProcessedDccex = false;
                 }
 
             } else { // turnouts list  <jT id1 id2 id3 ...>
 
-                Log.d("EX_Toolbox", "comm_thread.processDccexTurnouts: Turnouts list received.");
+                Log.d(threaded_application.applicationName, activityName + ": processDccexTurnouts: Turnouts list received.");
                 if (!mainapp.turnoutsBeingProcessedDccex) {
                     mainapp.turnoutsBeingProcessedDccex = true;
                     if (mainapp.turnoutStringDccex.isEmpty()) {
@@ -1555,7 +1582,7 @@ public class comm_thread extends Thread {
                         }
 
                         int count = (mainapp.turnoutIDsDccex==null) ? 0 : mainapp.turnoutIDsDccex.length;
-                        Log.d("EX_Toolbox", "comm_thread.processDccexTurnouts: Turnouts list received. Count: " + count);
+                        Log.d(threaded_application.applicationName, activityName + ": processDccexTurnouts: Turnouts list received. Count: " + count);
                     }
                 }
             }
@@ -1611,13 +1638,13 @@ public class comm_thread extends Thread {
                     mainapp.dccexListsRequested++;
 
                     int count = (mainapp.routeIDsDccex==null) ? 0 : mainapp.routeIDsDccex.length;
-                    Log.d("EX_Toolbox", "comm_thread.processDccexRoutes: Routes complete. Count: " + count);
+                    Log.d(threaded_application.applicationName, activityName + ": processDccexRoutes: Routes complete. Count: " + count);
                     mainapp.routesBeingProcessedDccex = false;
                 }
 
             } else { // routes list   <jA id1 id2 id3 ...>   or <jA> for empty
 
-                Log.d("EX_Toolbox", "comm_thread.processDccexRoutes: Routes list received.");
+                Log.d(threaded_application.applicationName, activityName + ": processDccexRoutes: Routes list received.");
                 if (!mainapp.routesBeingProcessedDccex) {
                     mainapp.routesBeingProcessedDccex = true;
                     if (mainapp.routeStringDccex.isEmpty()) {
@@ -1634,7 +1661,7 @@ public class comm_thread extends Thread {
                         }
 
                         int count = (mainapp.routeIDsDccex==null) ? 0 : mainapp.routeIDsDccex.length;
-                        Log.d("EX_Toolbox", "comm_thread.processDccexRoutes: Routes list received. Count: " + count);
+                        Log.d(threaded_application.applicationName, activityName + ": processDccexRoutes: Routes list received. Count: " + count);
                     }
                 }
             }
@@ -1647,7 +1674,7 @@ public class comm_thread extends Thread {
     //  //RF29}|{4805(L)]\[Light]\[Bell]\[Horn]\[Air]\[Uncpl]\[BrkRls]\[]\[]\[]\[]\[]\[]\[Engine]\[]\[]\[]\[]\[]\[BellSel]\[HornSel]\[]\[]\[]\[]\[]\[]\[]\[]\[
     static void processRosterFunctionString(String responseStr, int whichThrottle) {
 
-        Log.d("EX_Toolbox", "comm_thread.processRosterFunctionString: processing function labels for " + mainapp.throttleIntToString(whichThrottle));
+        Log.d(threaded_application.applicationName, activityName + ": processRosterFunctionString: processing function labels for " + mainapp.throttleIntToString(whichThrottle));
         String[] ta = threaded_application.splitByString(responseStr, "]\\[");  //split into list of labels
 
         //populate a temp label array from RF command string
@@ -1681,7 +1708,7 @@ public class comm_thread extends Thread {
                 try {
                     mainapp.roster_entries.put(tv[0], tv[1] + "(" + tv[2] + ")"); //roster name is hashmap key, value is address(L or S), e.g.  2591(L)
                 } catch (Exception e) {
-                    Log.d("EX_Toolbox", "comm_thread.processRosterList caught Exception");  //ignore any bad stuff in roster entries
+                    Log.d(threaded_application.applicationName, activityName + ": processRosterList caught Exception");  //ignore any bad stuff in roster entries
                 }
             }  //end if i>0
             i++;
@@ -1711,13 +1738,13 @@ public class comm_thread extends Thread {
             }  //end if i==0
             i++;
         }  //end for
-        Log.d("EX_Toolbox", "comm_thread.processConsistList: consist header, addr='" + consist_addr
+        Log.d(threaded_application.applicationName, activityName + ": processConsistList: consist header, addr='" + consist_addr
                 + "', name='" + consist_name + "', desc='" + consist_desc + "'");
         //don't add empty consists to list
         if (mainapp.consist_entries != null && consist_desc.length() > 0) {
             mainapp.consist_entries.put(consist_addr, consist_desc.toString());
         } else {
-            Log.d("EX_Toolbox", "comm_thread.processConsistList: skipping empty consist '" + consist_name + "'");
+            Log.d(threaded_application.applicationName, activityName + ": processConsistList: skipping empty consist '" + consist_name + "'");
         }
     }
 
@@ -1887,9 +1914,9 @@ public class comm_thread extends Thread {
     //send formatted msg to the socket using multithrottle format
     //  intermessage gap enforced by requeueing messages as needed
     protected static void wifiSend(String msg) {
-        Log.d("EX_Toolbox", "comm_thread.wifiSend: WiT send '" + msg + "'");
+        Log.d(threaded_application.applicationName, activityName + ": wifiSend: WiT send '" + msg + "'");
         if (msg == null) { //exit if no message
-            Log.d("EX_Toolbox", "comm_thread.wifiSend: --> null msg");
+            Log.d(threaded_application.applicationName, activityName + ": wifiSend: --> null msg");
             return;
         } else {
             if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
@@ -1916,7 +1943,7 @@ public class comm_thread extends Thread {
         //send if sufficient gap between messages or msg is timingSensitive, requeue if not
         if (lastGap >= threaded_application.WiThrottle_Msg_Interval || timingSensitive(msg)) {
             //perform the 'send'
-            Log.d("EX_Toolbox", "comm_thread.wifiSend: " + (mainapp.isDccex ? "DCC-EX" : "") + "           <:> -->:" + msg.replaceAll("\n", "\u21B5") + " (" + lastGap + ")"); //replace newline with cr arrow
+            Log.d(threaded_application.applicationName, activityName + ": wifiSend: " + (mainapp.isDccex ? "DCC-EX" : "") + "           <:> -->:" + msg.replaceAll("\n", "\u21B5") + " (" + lastGap + ")"); //replace newline with cr arrow
             lastSentMs = now;
             if ((!mainapp.isUSB) && (!mainapp.isUdp) ) {
                 socketWiT.Send(msg);
@@ -1932,7 +1959,7 @@ public class comm_thread extends Thread {
         } else {
             //requeue this message
             int nextGap = Math.max((int) (lastQueuedMs - now), 0) + (threaded_application.WiThrottle_Msg_Interval + 5); //extra 5 for processing
-            Log.d("EX_Toolbox", "comm_thread.wifiSend: requeue:" + msg.replaceAll("\n", "\u21B5") +
+            Log.d(threaded_application.applicationName, activityName + ": wifiSend: requeue:" + msg.replaceAll("\n", "\u21B5") +
                     ", lastGap=" + lastGap + ", nextGap=" + nextGap); //replace newline with cr arrow
             mainapp.sendMsgDelay(mainapp.comm_msg_handler, nextGap, message_type.WIFI_SEND, msg);
             lastQueuedMs = now + nextGap;
@@ -1947,9 +1974,9 @@ public class comm_thread extends Thread {
 //        if (!msg.matches("^<[oD]")) {  // can't figure out why this doesn't work
         if ( (msg.contains("<o")) || (msg.contains("<D")) ) {
             ret = true;
-            Log.d("EX_Toolbox", "comm_thread.timingSensitive: timeSensitive msg, not requeueing: " + msg);
+            Log.d(threaded_application.applicationName, activityName + ": timingSensitive: timeSensitive msg, not requeueing: " + msg);
         } else {
-            Log.d("EX_Toolbox", "comm_thread.timingSensitive: timeSensitive msg, can requeue: " + msg);
+            Log.d(threaded_application.applicationName, activityName + ": timingSensitive: timeSensitive msg, can requeue: " + msg);
         }
         return ret;
     }
@@ -1958,7 +1985,7 @@ public class comm_thread extends Thread {
         Looper.prepare();
         mainapp.comm_msg_handler = new comm_handler(mainapp, prefs, this);
         Looper.loop();
-        Log.d("EX_Toolbox", "comm_thread.run() exit");
+        Log.d(threaded_application.applicationName, activityName + ": run() exit");
     }
 
     /* ******************************************************************************************** */
@@ -2008,20 +2035,20 @@ public class comm_thread extends Thread {
 //            if (socketOk) {
 //                try {
 //                    //look for someone to answer on specified socket, and set timeout
-//                    Log.d("EX_Toolbox", "comm_thread.socketWifi: Opening socket, connectTimeout=" + connectTimeoutMs + " and socketTimeout=" + socketTimeoutMs);
+//                    Log.d(threaded_application.applicationName, activityName + ": socketWifi: Opening socket, connectTimeout=" + connectTimeoutMs + " and socketTimeout=" + socketTimeoutMs);
 //                    clientSocket = new Socket();
 //                    InetSocketAddress sa = new InetSocketAddress(mainapp.host_ip, mainapp.port);
 //                    clientSocket.connect(sa, connectTimeoutMs);
-//                    Log.d("EX_Toolbox", "comm_thread.socketWifi: Opening socket: Connect successful.");
+//                    Log.d(threaded_application.applicationName, activityName + ": socketWifi: Opening socket: Connect successful.");
 //                    clientSocket.setSoTimeout(socketTimeoutMs);
-//                    Log.d("EX_Toolbox", "comm_thread.socketWifi: Opening socket: set timeout successful.");
+//                    Log.d(threaded_application.applicationName, activityName + ": socketWifi: Opening socket: set timeout successful.");
 //                } catch (Exception except) {
 //                    if (!firstConnect) {
 //                        threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppCantConnect,
 //                                mainapp.host_ip, Integer.toString(mainapp.port), mainapp.client_address, except.getMessage()), Toast.LENGTH_LONG);
 //                    }
 //                    if ((!mainapp.client_type.equals("WIFI")) && (mainapp.prefAllowMobileData)) { //show additional message if using mobile data
-//                        Log.d("EX_Toolbox", "comm_thread.socketWifi: Opening socket: Using mobile network, not WIFI. Check your WiFi settings and Preferences.");
+//                        Log.d(threaded_application.applicationName, activityName + ": socketWifi: Opening socket: Using mobile network, not WIFI. Check your WiFi settings and Preferences.");
 //                        threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppNotWIFI, mainapp.client_type), Toast.LENGTH_LONG);
 //                    }
 //                    socketOk = false;
@@ -2094,7 +2121,7 @@ public class comm_thread extends Thread {
 //                try {
 //                    clientSocket.close();
 //                } catch (Exception e) {
-//                    Log.d("EX_Toolbox", "comm_thread.socketWifi: Error closing the Socket: " + e.getMessage());
+//                    Log.d(threaded_application.applicationName, activityName + ": socketWifi: Error closing the Socket: " + e.getMessage());
 //                }
 //            }
 //        }
@@ -2117,7 +2144,7 @@ public class comm_thread extends Thread {
 //                        socketGood = this.SocketCheck();
 //                    } catch (IOException e) {
 //                        if (socketGood) {
-//                            Log.d("EX_Toolbox", "comm_thread.run(): WiT rcvr error.");
+//                            Log.d(threaded_application.applicationName, activityName + ": run(): WiT rcvr error.");
 //                            socketGood = false;     //input buffer error so force reconnection on next send
 //                        }
 //                    }
@@ -2127,7 +2154,7 @@ public class comm_thread extends Thread {
 //                }
 //            }
 //            heart.stopHeartbeat();
-//            Log.d("EX_Toolbox", "comm_thread.run(): socketWifi exit.");
+//            Log.d(threaded_application.applicationName, activityName + ": run(): socketWifi exit.");
 //        }
 //
 //        @SuppressLint("StringFormatMatches")
@@ -2138,13 +2165,13 @@ public class comm_thread extends Thread {
 //                String status;
 //                if (mainapp.client_address == null) {
 //                    status = threaded_application.context.getResources().getString(R.string.statusThreadedAppNotConnected);
-//                    Log.d("EX_Toolbox", "comm_thread.send(): WiT send reconnection attempt.");
+//                    Log.d(threaded_application.applicationName, activityName + ": send(): WiT send reconnection attempt.");
 //                } else if (inboundTimeout) {
 //                    status = threaded_application.context.getResources().getString(R.string.statusThreadedAppNoResponse, mainapp.host_ip, Integer.toString(mainapp.port), heart.getInboundInterval());
-//                    Log.d("EX_Toolbox", "comm_thread.send(): WiT receive reconnection attempt.");
+//                    Log.d(threaded_application.applicationName, activityName + ": send(): WiT receive reconnection attempt.");
 //                } else {
 //                    status = threaded_application.context.getResources().getString(R.string.statusThreadedAppUnableToConnect, mainapp.host_ip, Integer.toString(mainapp.port), mainapp.client_address);
-//                    Log.d("EX_Toolbox", "comm_thread.send(): WiT send reconnection attempt.");
+//                    Log.d(threaded_application.applicationName, activityName + ": send(): WiT send reconnection attempt.");
 //                }
 //                socketGood = false;
 //
@@ -2167,12 +2194,12 @@ public class comm_thread extends Thread {
 //                    if (reconInProg) {
 //                        String status = "Connected to WiThrottle Server at " + mainapp.host_ip + ":" + mainapp.port;
 //                        mainapp.sendMsg(mainapp.comm_msg_handler, message_type.WIT_CON_RECONNECT, status);
-//                        Log.d("EX_Toolbox", "comm_thread.send(): WiT reconnection successful.");
+//                        Log.d(threaded_application.applicationName, activityName + ": send(): WiT reconnection successful.");
 //                        clearInboundTimeout();
 //                        heart.restartInboundInterval();     //socket is good so restart inbound heartbeat timer
 //                    }
 //                } catch (Exception e) {
-//                    Log.d("EX_Toolbox", "comm_thread.send(): WiT xmtr error.");
+//                    Log.d(threaded_application.applicationName, activityName + ": send(): WiT xmtr error.");
 //                    socketGood = false;             //output buffer error so force reconnection on next send
 //                }
 //            }
@@ -2210,7 +2237,7 @@ public class comm_thread extends Thread {
 //                        if ((Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
 //                                && (!mainapp.haveForcedWiFiConnection)) {
 //
-//                            Log.d("EX_Toolbox", "comm_thread.HaveNetworkConnection: NetworkRequest.Builder");
+//                            Log.d(threaded_application.applicationName, activityName + ": HaveNetworkConnection: NetworkRequest.Builder");
 //                            NetworkRequest.Builder request = new NetworkRequest.Builder();
 //                            request.addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
 //
@@ -2250,14 +2277,14 @@ public class comm_thread extends Thread {
 //
 //        void InboundTimeout() {
 //            if (++inboundTimeoutRetryCount >= MAX_INBOUND_TIMEOUT_RETRIES) {
-//                Log.d("EX_Toolbox", "comm_thread.InboundTimeout: WiT max inbound timeouts");
+//                Log.d(threaded_application.applicationName, activityName + ": InboundTimeout: WiT max inbound timeouts");
 //                inboundTimeout = true;
 //                inboundTimeoutRetryCount = 0;
 //                inboundTimeoutRecovery = false;
 //                // force a send to start the reconnection process
 //                mainapp.comm_msg_handler.postDelayed(heart.outboundHeartbeatTimer, 200L);
 //            } else {
-//                Log.d("EX_Toolbox", "comm_thread.InboundTimeout: WiT inbound timeout " +
+//                Log.d(threaded_application.applicationName, activityName + ": InboundTimeout: WiT inbound timeout " +
 //                        Integer.toString(inboundTimeoutRetryCount) + " of " + MAX_INBOUND_TIMEOUT_RETRIES);
 //                // heartbeat should trigger a WiT reply so force that now
 //                inboundTimeoutRecovery = true;
@@ -2375,7 +2402,7 @@ public class comm_thread extends Thread {
             mainapp.comm_msg_handler.removeCallbacks(outboundHeartbeatTimer);           //remove any pending requests
             mainapp.comm_msg_handler.removeCallbacks(inboundHeartbeatTimer);
             heartbeatIntervalSetpoint = 0;
-            Log.d("EX_Toolbox", "comm_thread.stopHeartbeat: heartbeat stopped.");
+            Log.d(threaded_application.applicationName, activityName + ": stopHeartbeat: heartbeat stopped.");
         }
 
         //outboundHeartbeatTimer()
@@ -2499,7 +2526,7 @@ public class comm_thread extends Thread {
         void stopTimer() {
             mainapp.comm_msg_handler.removeCallbacks(currentTimer);           //remove any pending requests
             timerStarted = false;
-            Log.d("EX_Toolbox", "comm_thread.stopTimer: timer stopped.");
+            Log.d(threaded_application.applicationName, activityName + ": stopTimer: timer stopped.");
         }
 
         //outboundHeartbeatTimer()

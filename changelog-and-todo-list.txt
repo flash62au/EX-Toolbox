@@ -3,6 +3,8 @@
    * Support UDP connection to CS
  * Bug Fixes
  * Other
+   * Removal of local copy of the jMDNS library so later versions will be used.
+   * AI suggested changes to the mDNS startup so that it immediately checks for services on app restart.
 **Version 0.1.38
  * New Features
  * Bug Fixes
