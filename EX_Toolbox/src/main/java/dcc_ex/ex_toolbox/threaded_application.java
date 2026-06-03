@@ -770,6 +770,20 @@ public class threaded_application extends Application {
         if (getHostIp() != null) {
             s += "<small>, Protocol: </small>";
             s += "<b>DCC-EX</b>";
+
+            String transport;
+            if (!mainapp.isUSB) {
+                transport = switch (mainapp.connectedServiceType) {
+                case threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP -> "TCP (JMRI)";
+                case threaded_application.JMDNS_SERVICE_DCC_EX_UDP -> "UDP";
+//                case threaded_application.JMDNS_SERVICE_DCC_EX_TCP -> "TCP";
+                default -> "TCP";
+            };
+            } else {
+                transport = "USB";
+            }
+            s += "<small>, Transport: </small><b>" + transport + "</b>";
+
             s += String.format("<small>, Host: </small><b>%s</b>", getHostIp() );
             s += String.format("<small> Port: </small><b>%s</b>", connectedPort);
             //show server type and description if set
