@@ -107,9 +107,10 @@
         <item>Start Route/Automation {loco} {id}</item>
         <item>Kill Automations {id|ALL}</item>
         <item>--- Diagnostic Commands ---</item>
-        <item>ACK Limit {mA}</item>
-        <item>ACK Min {µS}</item>
-        <item>ACK Max {µS}</item>
+        <item>PROG Acknowledge Diagnostics {ON|OFF}</item>
+        <item>PROG Acknowledge Limit {mA}</item>
+        <item>PROG Acknowledge Min {µS}</item>
+        <item>PROG Acknowledge Max {µS}</item>
         <item>Reboot/Reset CS</item>
         <item>Reset HAL Devices</item>
         <item>Show All HAL Devices</item>
@@ -142,6 +143,7 @@
         <item>/ START</item>
         <item>/ KILL</item>
         <item />
+        <item>D ACK</item>
         <item>D ACK LIMIT</item>
         <item>D ACK MIN</item>
         <item>D ACK MAX</item>
@@ -177,6 +179,7 @@
         <item>1</item>  // /START
         <item>1</item>  // /KILL
         <item>0</item>  // delimiter
+        <item>1</item>  // D ACK
         <item>1</item>  // D ACK LIMIT
         <item>1</item>  // D ACK MIN
         <item>1</item>  // D ACK MAX
@@ -215,6 +218,7 @@
         <item>Start a new task to send a loco onto a Route, or activate a non-loco Animation or Sequence {loco} {id}</item>  // /START
         <item>Kills a currently running script task by ID or "ALL" {id|ALL}</item>                       // /KILL ALL
         <item />                                                                                // delimiter
+        <item>Enables/disables the ACK pulse diagnostics {ON|OFF}</item>      // D ACK
         <item>Override the minimum milliamps (mA) required to detect the ACK pulse {mA}</item>      // D ACK LIMIT
         <item>Override the minimum amount of time in microseconds (µS) the pulse needs to be active {µS}</item>  // D ACK MIN
         <item>Override the maximum amount of time required to detect the ACK pulse {µS}</item>      // D ACK MAX
@@ -222,8 +226,8 @@
         <item>Reset the HAL Devices</item>                                                      // D HAL RESET
         <item>List HAL devices and allocated VPINs</item>                                       // D HAL SHOW
         <item>Override prog track limit if programming decoders trigger current limiting on the programming track</item> // D PROGBOOST
-        <item>Enables/disables Ethernet diagnostics</item>                                      // D ETHERNET
-        <item>Enables/disables WiThrottle diagnostics</item>                                    // D WIT
+        <item>Enables/disables Ethernet diagnostics {ON|OFF}</item>                                      // D ETHERNET
+        <item>Enables/disables WiThrottle diagnostics {ON|OFF}</item>                                    // D WIT
         <item>Show free RAM</item>                                                              // D RAM
         <item>Show Consists/MUs</item>                                                          // ^
         <item>Query EStop</item>                                                                // !Q

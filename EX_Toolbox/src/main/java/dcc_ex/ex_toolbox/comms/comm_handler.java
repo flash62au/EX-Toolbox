@@ -31,9 +31,13 @@ import android.util.Log;
 import android.webkit.WebView;
 import android.widget.Toast;
 
+import com.hoho.android.usbserial.driver.UsbSerialDriver;
+import com.hoho.android.usbserial.driver.UsbSerialProber;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Objects;
 
 import dcc_ex.ex_toolbox.R;
@@ -653,16 +657,16 @@ public class comm_handler extends Handler {
 
    public boolean areAnyUsbDevicesConnected() {
       UsbManager manager = (UsbManager) mainapp.getBaseContext().getSystemService(Context.USB_SERVICE);
-      HashMap<String, UsbDevice> deviceList = manager.getDeviceList();
+      List<UsbSerialDriver> availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager);
 
-      if (!deviceList.isEmpty()) {
-         for (UsbDevice device : deviceList.values()) {
-            // A USB device is connected
-            Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: Device Name: " + device.getDeviceName());
+      if (!availableDrivers.isEmpty()) {
+         for (UsbSerialDriver driver : availableDrivers) {
+            // A USB Serial device is connected
+            Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: Device Name: " + driver.getDevice().getDeviceName());
             return true;
          }
       } else {
-         Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: No USB devices connected.");
+         Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: No supported USB serial devices connected.");
       }
       return false;
    }
