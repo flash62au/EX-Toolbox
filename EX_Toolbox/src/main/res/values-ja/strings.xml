@@ -212,6 +212,14 @@
     <string name="toastForcedWiFiFailed">強制Wi-Fi接続に失敗しました。もう一度お試しください。(このデバイスのIPアドレス: %1$s)</string>
     <string name="toastPreferencesChangedForceWiFi">\'モバイルデータを許可する\'設定が変更されました。</string>
     <string name="toastConnectionsListHelp">タッチしてサーバーを選択するか、サーバーのアドレスとポートを入力します。エントリを削除するには右にスワイプします。</string>
+
+    <string name="toastWasInBackgroundTitle">EX-Toolboxはバックグラウンドで実行され続けるようには設計されておらず、システムによっていつでも強制終了される可能性があります。\nどうしてもバックグラウンドで実行する必要がある場合は、「Androidシステム設定」→「アプリ」→「EX-Toolbox」→「アプリのバッテリー使用量」→「バックグラウンド使用を許可」を有効にしてください。</string>
+    <string name="notificationInBackgroundTitle">EX-Toolboxがバックグラウンドで動作中</string>
+    <string name="notificationInBackgroundText">☠️Androidは予告なくいつでもアプリを終了する可能性があります。タップして再度開いてください。</string>
+    <string name="notificationInBackgroundTextLowMemory">☠️メモリ不足です。EX-Toolboxはまもなく停止する可能性があります。タップして再開してください。</string>
+    <string name="notificationInBackgroundTextKilled">☠️メモリが不足しています。EX-Toolboxは終了しました。</string>
+    <string name="notificationAppWasKilledInBackground">EX-ToolboxがAndroidによって強制的に再起動されました</string>
+
     <string name="toastSaveLogFile">ファイル %1$s でログ記録が開始されました。EX-Toolbox アプリを終了するまでログ記録は継続されます。</string>
     <string name="logViewerTitle">ログビューアアクティビティ | %1$s</string>
     <string name="infoSaveLogFile">ログ出力先: %s</string>
@@ -338,6 +346,7 @@
     <string name="cvBitCalculatorCvValueLabel">CV値（10進数）</string>
     <string name="cvBitCalculatorCvBitsLabel">ビット:</string>
     <string name="dccexCvBitCalculatorConfirmButtonLabel">確認</string>
+    <string name="dccexDcTrackAddressHint">住所？</string>
     <string name="dccexSetTrackButtonLabel">セット</string>
     <string name="DccexJoinTrackButtonLabel">参加</string>
     <string name="dccexSucceeded">操作成功</string>

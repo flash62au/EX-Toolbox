@@ -371,6 +371,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
                     String found_ip_address = hm.get("ip_address");
                     String found_port = hm.get("port");
                     String found_service_type = hm.get("service_type");
+                    if ( (found_service_type!=null) && (!found_service_type.isEmpty()) && (found_service_type.charAt(0)=='.') ) found_service_type = found_service_type.substring(1);
                     Log.d("EX_Toolbox", String.format("handleMessage(): serviceResolved: '%s'", found_service_type));
                     boolean entryExists = false;
 
@@ -633,10 +634,6 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
 
         set_labels();
         mainapp.cancelForcingFinish();            // if fresh start or restart after being killed in the bkg, indicate app is running again
-        //start up server discovery listener again (after a 1 second delay)
-        //TODO: this is a rig, figure out why this is needed for ubuntu servers
-        //	    sendMsgErr(1000, message_type.SET_LISTENER, "", 1, "ERROR in ca.onResume: comm thread not started.") ;
-        mainapp.sendMsgDelay(mainapp.comm_msg_handler, 1000L, message_type.SET_LISTENER, "", 1, 0);
 
         if (prefs.getBoolean("connect_to_first_server_preference", false)) {
             connectA();

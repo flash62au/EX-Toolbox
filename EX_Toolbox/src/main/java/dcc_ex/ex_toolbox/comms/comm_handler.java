@@ -22,7 +22,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Handler;
@@ -35,7 +34,6 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -88,23 +86,8 @@ public class comm_handler extends Handler {
                   if ((!mainapp.client_type.equals("WIFI")) && (mainapp.prefAllowMobileData)) {
                      threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppNotWIFI, mainapp.client_type), Toast.LENGTH_LONG);
                   }
-                  if (commThread.jmdns == null) {   //start jmdns if not started
+                  if ( (commThread.jmdns == null) && (commThread.nsdManager == null) ) {   //start jmdns if not started
                      commThread.startJmdns();
-                     if (commThread.jmdns != null) {  //don't bother if jmdns didn't start
-                        try {
-                           commThread.multicast_lock.acquire();
-                        } catch (Exception e) {
-                           //log message, but keep going if this fails
-                           Log.d("EX_Toolbox", "comm_handler.handleMessage: multicast_lock.acquire() failed");
-                        }
-                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, commThread.listener);
-                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, commThread.listener);
-                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, commThread.listener);
-                        commThread.jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, commThread.listener);
-                        Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns listener added");
-                     } else {
-                        Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns not running, didn't start listener");
-                     }
                   } else {
                      Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns already running");
                   }

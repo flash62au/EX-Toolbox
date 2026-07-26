@@ -289,6 +289,13 @@
     <string name="toastPreferencesChangedForceWiFi">\'Allow Mobile Data\' preference changed.</string>
     <string name="toastConnectionsListHelp">Touch to select a Server,\n  or enter Server Address and Port.\nSwipe Right to remove an entry.</string>
 
+    <string name="toastWasInBackgroundTitle">EX-Toolbox is not designed to continue running while in background and may be killed by the system at any time.\nIf you really need to try to run it in background, make sure to enable the \'Android System Setting->Apps->EX-Toolbox->App Battery Usage->Allow Background Usage\'</string>
+    <string name="notificationInBackgroundTitle">EX-Toolbox in Background</string>
+    <string name="notificationInBackgroundText">☠️Android may kill it at any time without warning. Tap to reopen</string>
+    <string name="notificationInBackgroundTextLowMemory">☠️Memory low. EX-Toolbox may be killed soon. Tap to reopen</string>
+    <string name="notificationInBackgroundTextKilled">☠️Memory exhausted. EX-Toolbox has been killed</string>
+    <string name="notificationAppWasKilledInBackground">EX-Toolbox forced to restart by Android</string>
+
     <!--    Toast messages for the Import/Export -->
 <!--    <string name="toastImportExportExportSucceeded">Preferences export to \'\\Android\\data\\dcc_ex.ex_toolbox\\files\\%1$s\' succeeded.</string>-->
 <!--    <string name="toastImportExportImportSucceeded">Preferences import from \'\\Android\\data\\dcc_ex.ex_toolbox\\files\\%1$s\' succeeded.</string>-->
@@ -531,6 +538,7 @@
     <string name="cvBitCalculatorCvBitsLabel">Bits:</string>
     <string name="dccexCvBitCalculatorConfirmButtonLabel">Confirm</string>
 
+    <string name="dccexDcTrackAddressHint">Addr?</string>
     <string name="dccexSetTrackButtonLabel">Set</string>
     <string name="DccexJoinTrackButtonLabel">Join</string>
 

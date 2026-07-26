@@ -40,7 +40,7 @@
         <item name="android:actionMenuTextColor">@color/original_primary_text_color_selector</item>
         <item name="android:textColorPrimary">@color/original_primary_text_color_selector</item>
         <item name="android:textColorSecondary">@color/original_secondary_text_color_selector</item>
-        <item name="android:textColorHint">@color/tertiary_text</item>
+        <item name="android:textColorHint">@color/hint_text</item>
         <item name="android:textColorPrimaryDisableOnly">@color/primaryDisabled</item>
 
         <item name="ed_primaryLineColor">@color/grey</item>
@@ -153,7 +153,7 @@
         <item name="android:actionMenuTextColor">@color/black_primary_text_color_selector</item>
         <item name="android:textColorPrimary">@color/black_primary_text_color_selector</item>
         <item name="android:textColorSecondary">@color/black_secondary_text_color_selector</item>
-        <item name="android:textColorHint">@color/tertiary_text</item>
+        <item name="android:textColorHint">@color/hint_text</item>
 
         <item name="ed_primaryLineColor">@color/grey</item>
         <item name="ed_secondaryLineColor">@color/darkGrey</item>
@@ -260,7 +260,7 @@
         <item name="android:actionMenuTextColor">@color/black_primary_text_color_selector</item>
         <item name="android:textColorPrimary">@color/black_primary_text_color_selector</item>
         <item name="android:textColorSecondary">@color/black_secondary_text_color_selector</item>
-        <item name="android:textColorHint">@color/tertiary_text</item>
+        <item name="android:textColorHint">@color/hint_text</item>
 
         <item name="ed_primaryLineColor">@color/grey</item>
         <item name="ed_secondaryLineColor">@color/darkGrey</item>
@@ -368,7 +368,7 @@
         <item name="android:actionMenuTextColor">@color/black_primary_text_color_selector</item>
         <item name="android:textColorPrimary">@color/black_primary_text_color_selector</item>
         <item name="android:textColorSecondary">@color/black_secondary_text_color_selector</item>
-        <item name="android:textColorHint">@color/tertiary_text</item>
+        <item name="android:textColorHint">@color/hint_text</item>
 
         <item name="ed_primaryLineColor">@color/grey</item>
         <item name="ed_secondaryLineColor">@color/darkGrey</item>
@@ -592,7 +592,7 @@
         <item name="android:actionMenuTextColor">@color/black_primary_text_color_selector</item>
         <item name="android:textColorPrimary">@color/black_primary_text_color_selector</item>
         <item name="android:textColorSecondary">@color/black_secondary_text_color_selector</item>
-        <item name="android:textColorHint">@color/tertiary_text</item>
+        <item name="android:textColorHint">@color/hint_text</item>
 
         <item name="ed_primaryLineColor">@color/neon_blue</item>
         <item name="ed_secondaryLineColor">@color/neon_blue_very_dark</item>

@@ -21,7 +21,10 @@ package dcc_ex.ex_toolbox.comms;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Looper;
 import android.os.Message;
 import android.text.Html;
@@ -52,7 +55,15 @@ public class comm_thread extends Thread {
     JmDNS jmdns = null;
     volatile boolean endingJmdns = false;
     WithrottleListener listener;
-    android.net.wifi.WifiManager.MulticastLock multicast_lock;
+
+    NsdManager nsdManager;
+    NsdDiscoveryListener withrottleDiscoveryListener;
+    NsdDiscoveryListener jmriDccexDiscoveryListener;
+    NsdDiscoveryListener dccexTcpDiscoveryListener;
+    NsdDiscoveryListener dccexUdpDiscoveryListener;
+
+    static android.net.wifi.WifiManager.MulticastLock multicast_lock;
+
 //    static socketWifi socketWiT;
     static SocketWiFi socketWiT;
     static SocketUsb socketUsb;
@@ -70,7 +81,7 @@ public class comm_thread extends Thread {
 
     private static int requestLocoIdForWhichThrottleDccex;
 
-    static final String[] TRACK_TYPES = {"NONE", "MAIN", "PROG", "DC", "DCX", "AUTO", "EXT", "PROG"};
+    static final String[] TRACK_TYPES = {"NONE", "MAIN", "PROG", "DC", "DCX", "AUTO", "EXT", "BOOST"};
     static final boolean[] TRACK_TYPES_NEED_ID = {false, false, false, true, true, false, false, false};
 //    static final boolean[] TRACK_TYPES_SELECTABLE = {true, true, true, true, true, true, false, false};
 
@@ -81,6 +92,130 @@ public class comm_thread extends Thread {
         prefs = myPrefs;
 
         this.start();
+    }
+
+    /* ******************************************************************************************** */
+
+    private final java.util.List<NsdServiceInfo> nsdResolveQueue = new java.util.ArrayList<>();
+    private boolean nsdResolveInProgress = false;
+
+    private void resolveNextNsdService() {
+        synchronized (nsdResolveQueue) {
+            if (nsdResolveInProgress || nsdResolveQueue.isEmpty() || nsdManager == null) {
+                return;
+            }
+            nsdResolveInProgress = true;
+            NsdServiceInfo next = nsdResolveQueue.remove(0);
+            Log.d(threaded_application.applicationName, activityName + ": resolveNextNsdService(): resolving " + next.getServiceName());
+
+            nsdManager.resolveService(next, new NsdManager.ResolveListener() {
+                @Override
+                public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
+                    Log.d(threaded_application.applicationName, activityName + ": resolveNextNsdService: onResolveFailed(): " + serviceInfo.getServiceName() + ", error: " + errorCode);
+                    nsdResolveInProgress = false;
+                    resolveNextNsdService();
+                }
+
+                @Override
+                public void onServiceResolved(NsdServiceInfo resolvedServiceInfo) {
+                    Log.d(threaded_application.applicationName, activityName + ": resolveNextNsdService: onServiceResolved(): " + resolvedServiceInfo.getServiceName());
+
+                    int port = resolvedServiceInfo.getPort();
+                    String ip_address = resolvedServiceInfo.getHost().getHostAddress();
+                    if (ip_address.startsWith("/")) ip_address = ip_address.substring(1);
+
+                    // Map back to original types for app compatibility
+                    String type = resolvedServiceInfo.getServiceType();
+                    if (type.endsWith(".")) type = type.substring(0, type.length()-1);
+                    String appServiceType = type + ".local.";
+
+                    String host_name = modifyHostName(resolvedServiceInfo.getServiceName(), appServiceType);
+
+                    String serverType = "";
+                    if (resolvedServiceInfo.getServiceName().toLowerCase().contains("jmri")) serverType = "JMRI";
+
+                    HashMap<String, String> hm = new HashMap<>();
+                    hm.put("ip_address", ip_address);
+                    hm.put("port", ((Integer) port).toString());
+                    hm.put("host_name", host_name);
+                    hm.put("ssid", mainapp.client_ssid);
+                    appServiceType = (appServiceType.charAt(0)!='.') ? appServiceType : appServiceType.substring(1);
+                    hm.put("service_type", appServiceType);
+
+                    String key = ip_address+":"+port;
+                    mainapp.knownDccexServerIps.put(key, serverType);
+
+                    Message service_message = Message.obtain();
+                    service_message.what = message_type.SERVICE_RESOLVED;
+                    service_message.arg1 = port;
+                    service_message.obj = hm;  //send the hashmap as the payload
+                    boolean sent = false;
+                    try {
+                        sent = mainapp.connection_msg_handler.sendMessage(service_message);
+                    } catch (Exception ignored) {
+                    }
+                    if (!sent)
+                        service_message.recycle();
+
+                    nsdResolveInProgress = false;
+                    resolveNextNsdService();
+                }
+            });
+        }
+    }
+
+    public class NsdDiscoveryListener implements NsdManager.DiscoveryListener {
+        private final String originalServiceType;
+
+        public NsdDiscoveryListener(String serviceType) {
+            this.originalServiceType = serviceType;
+        }
+
+        @Override
+        public void onStartDiscoveryFailed(String serviceType, int errorCode) {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: onStartDiscoveryFailed(): " + serviceType + ", error: " + errorCode);
+            stopDiscovery();
+        }
+
+        @Override
+        public void onStopDiscoveryFailed(String serviceType, int errorCode) {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: onStopDiscoveryFailed(): " + serviceType + ", error: " + errorCode);
+        }
+
+        @Override
+        public void onDiscoveryStarted(String serviceType) {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: onDiscoveryStarted(): " + serviceType);
+        }
+
+        @Override
+        public void onDiscoveryStopped(String serviceType) {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: onDiscoveryStopped(): " + serviceType);
+        }
+
+        @Override
+        public void onServiceFound(NsdServiceInfo serviceInfo) {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: onServiceFound(): " + serviceInfo.getServiceName() + ", type: " + serviceInfo.getServiceType());
+            synchronized (nsdResolveQueue) {
+                nsdResolveQueue.add(serviceInfo);
+                resolveNextNsdService();
+            }
+        }
+
+        @Override
+        public void onServiceLost(NsdServiceInfo serviceInfo) {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: onServiceLost(): " + serviceInfo.getServiceName());
+//            Bundle bundle = new Bundle();
+//            bundle.putString(alert_bundle_tag_type.SERVICE, serviceInfo.getServiceName());
+//            mainapp.alertActivitiesWithBundle(message_type.SERVICE_REMOVED, bundle);
+            mainapp.sendMsg(mainapp.connection_msg_handler, message_type.SERVICE_REMOVED, serviceInfo.getServiceName()); //send the service name to be removed
+        }
+
+        private void stopDiscovery() {
+            Log.d(threaded_application.applicationName, activityName + ": NsdDiscoveryListener: stopDiscovery()");
+            try {
+                nsdManager.stopServiceDiscovery(this);
+            } catch (Exception ignored) {}
+        }
     }
 
     /* ******************************************************************************************** */
@@ -128,7 +263,7 @@ public class comm_thread extends Thread {
             hm.put("ssid", mainapp.client_ssid);
             hm.put("service_type", event.getInfo().getType());
 
-            String key = ""+ip_address+":"+port;
+            String key = ip_address+":"+port;
             mainapp.knownDccexServerIps.put(key, serverType);
 
             Message service_message = Message.obtain();
@@ -150,13 +285,17 @@ public class comm_thread extends Thread {
     }
 
     String modifyHostName(String hostName, String serviceType) {
+        String tempServiceType = (serviceType.charAt(0)!='.') ? serviceType : serviceType.substring(1);
         String resultHostName;
-        resultHostName = switch (serviceType) {
-            case threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP ->
+        resultHostName = switch (tempServiceType) {
+            case threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP,
+                 threaded_application.JMRI_TYPE ->
                     hostName + " [JMRI DCC-EX]";
-            case threaded_application.JMDNS_SERVICE_DCC_EX_TCP ->
+            case threaded_application.JMDNS_SERVICE_DCC_EX_TCP,
+                 threaded_application.DCCEX_TCP_TYPE ->
                     hostName + " [TCP DCC-EX]";
-            case threaded_application.JMDNS_SERVICE_DCC_EX_UDP ->
+            case threaded_application.JMDNS_SERVICE_DCC_EX_UDP,
+                 threaded_application.DCCEX_UDP_TYPE ->
                     hostName + " [UDP DCC-EX]";
             default ->
                     hostName;
@@ -165,23 +304,147 @@ public class comm_thread extends Thread {
     }
 
     void startJmdns() {
+        Log.d(threaded_application.applicationName, activityName + ": startJmdns()");
+        if (mainapp.appIsFinishing) {
+            Log.d(threaded_application.applicationName, activityName + ": startJmdns(): shutting down. do nothing");
+            return;
+        }
+
         //Set up to find a WiThrottle service via ZeroConf
         try {
             if (mainapp.client_address != null) {
+                if (endingJmdns) {
+                    Log.d(threaded_application.applicationName, activityName + ": startJmdns(): waiting for previous JmDNS to finish closing...");
+                    for (int i = 0; i < 100 && endingJmdns; i++) { // wait up to 10 seconds
+                        //noinspection BusyWait
+                        Thread.sleep(100);
+                    }
+                    if (endingJmdns) {
+                        Log.d(threaded_application.applicationName, activityName + ": startJmdns(): WARNING: previous JmDNS still closing, proceeding anyway");
+                    }
+                    Thread.sleep(500); // Give the OS/Network stack extra time to release the port
+                }
+
                 WifiManager wifi = (WifiManager) mainapp.getSystemService(Context.WIFI_SERVICE);
 
-                if (multicast_lock == null) {  //do this only as needed
+                if (multicast_lock == null) {
                     multicast_lock = wifi.createMulticastLock("ex_toolbox");
-                    multicast_lock.setReferenceCounted(true);
+                    multicast_lock.setReferenceCounted(false);
+                }
+
+                if (!multicast_lock.isHeld()) {
+                    multicast_lock.acquire();
                 }
 
                 Log.d(threaded_application.applicationName, activityName + ": startJmdns: local IP addr " + mainapp.client_address);
 
-                // pass ip + timestamp as name to avoid hostname lookup attempt and conflict with lingering previous instances
-                jmdns = JmDNS.create(mainapp.client_address_inet4, mainapp.client_address + "-" + System.currentTimeMillis());
+                // pass ip as address to bind to specifically
+                // On Android 7, some devices have issues if port 5353 is already bound by the system.
+                // JmDNS 3.6.x tries to use SO_REUSEADDR, but it may still fail if not supported or blocked.
 
-                listener = new WithrottleListener();
-                Log.d(threaded_application.applicationName, activityName + ": startJmdns: listener created");
+                int attempts = 0;
+                while ( (jmdns == null) && (attempts < 3) && (!mainapp.appIsFinishing) )  {
+                    attempts++;
+                    try {
+                        String jmdnsName = "EngineDriver-" + System.currentTimeMillis();
+                        if (attempts == 1) {
+                            Log.d(threaded_application.applicationName, activityName + ": startJmdns(): attempt 1: JmDNS.create(" + mainapp.client_address + ", " + jmdnsName + ")");
+                            // Use unique name to help avoid some conflicts on older Android
+                            jmdns = JmDNS.create(mainapp.client_address_inet4, jmdnsName);
+                        } else if (attempts == 2) {
+                            Log.d(threaded_application.applicationName, activityName + ": startJmdns(): attempt 2: JmDNS.create(null, " + jmdnsName + ")");
+                            jmdns = JmDNS.create(null, jmdnsName);
+                        } else {
+                            Log.d(threaded_application.applicationName, activityName + ": startJmdns(): attempt 3: JmDNS.create()");
+                            Thread.sleep(500);
+                            jmdns = JmDNS.create();
+                        }
+                    } catch (Exception e) {
+                        Log.d(threaded_application.applicationName, activityName + ": startJmdns(): attempt " + attempts + " failed: " + e.getMessage());
+                        String errMsg = (e.getMessage() != null) ? e.getMessage().toUpperCase() : "";
+                        if (errMsg.contains("EADDRINUSE") || errMsg.contains("ADDRESS ALREADY IN USE")) {
+                            if (attempts < 3) {
+                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): port in use, will retry...");
+                                Thread.sleep(200);
+                            }
+                        } else {
+                            throw e; // unknown error
+                        }
+                    }
+                }
+
+                if (jmdns != null) {
+                    listener = new WithrottleListener();
+                    Log.d(threaded_application.applicationName, activityName + ": startJmdns(): listener created");
+
+                    jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, listener);
+                    jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, listener);
+                    jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, listener);
+                    jmdns.addServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, listener);
+                    Log.d(threaded_application.applicationName, activityName + ": startJmdns(): jmdns listeners added");
+
+                    // Trigger a query for all services immediately in a separate thread as list() is blocking
+                    new Thread(() -> {
+                        try {
+                            if (jmdns != null) {
+                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_WITHROTTLE");
+                                jmdns.list(threaded_application.JMDNS_SERVICE_WITHROTTLE);
+                            }
+                        } catch (Exception ignored) {}
+                    }, "JmDNS-Query-withrottle").start();
+
+                    new Thread(() -> {
+                        try {
+                            if (jmdns != null) {
+                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_JMRI_DCCPP_OVERTCP");
+                                jmdns.list(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP);
+                            }
+                        } catch (Exception ignored) {}
+                    }, "JmDNS-Query-JMRI-TCP").start();
+
+                    new Thread(() -> {
+                        try {
+                            if (jmdns != null) {
+                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_DCC_EX_TCP");
+                                jmdns.list(threaded_application.JMDNS_SERVICE_DCC_EX_TCP);
+                            }
+                        } catch (Exception ignored) {}
+                    }, "JmDNS-Query-DCC-EX-TCP").start();
+
+                    new Thread(() -> {
+                        try {
+                            if (jmdns != null) {
+                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_DCC_EX_UDP");
+                                jmdns.list(threaded_application.JMDNS_SERVICE_DCC_EX_UDP);
+                            }
+                        } catch (Exception ignored) {}
+                    }, "JmDNS-Query-DCC-EX-UDP").start();
+
+//                    new Thread(() -> {
+//                        try {
+//                            if (jmdns != null) {
+//                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_WITHROTTLE");
+//                                jmdns.list(threaded_application.JMDNS_SERVICE_WITHROTTLE);
+//                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_JMRI_DCCPP_OVERTCP");
+//                                jmdns.list(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP);
+//                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_DCC_EX_TCP");
+//                                jmdns.list(threaded_application.JMDNS_SERVICE_DCC_EX_TCP);
+//                                Log.d(threaded_application.applicationName, activityName + ": startJmdns(): query JMDNS_SERVICE_DCC_EX_UDP");
+//                                jmdns.list(threaded_application.JMDNS_SERVICE_DCC_EX_UDP);
+//                            }
+//                        } catch (Exception ignored) {}
+//                    }, "JmDNS-Query").start();
+
+
+                }
+
+                // On many Android 5-9 devices, JmDNS fails to bind port 5353.
+                // We always try NsdManager as a fallback (or in parallel if JmDNS starts but finds nothing)
+                // For now, if JmDNS failed OR we are on a problematic version, start NsdManager.
+                if (jmdns == null || Build.VERSION.SDK_INT <= 28) {
+                    Log.d(threaded_application.applicationName, activityName + ": startJmdns(): JmDNS failed or SDK<=25, starting NsdManager fallback/parallel");
+                    startNsdFallback();
+                }
 
             } else {
                 threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppNoLocalIp), Toast.LENGTH_LONG);
@@ -189,11 +452,68 @@ public class comm_thread extends Thread {
         } catch (Exception except) {
             Log.d(threaded_application.applicationName, activityName + ": startJmdns - Error creating withrottle listener: " + except.getMessage());
             threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppErrorCreatingWiThrottle, except.getMessage()), Toast.LENGTH_SHORT);
+            // don't release lock here if we might be retrying later, but since we are exiting startJmdns...
+            if (multicast_lock != null && multicast_lock.isHeld() && jmdns == null && !endingJmdns) {
+                multicast_lock.release();
+            }
+        }
+
+        Log.d(threaded_application.applicationName, activityName + ": startJmdns(): end.");
+    }
+
+    void startNsdFallback() {
+        Log.d(threaded_application.applicationName, activityName + ": startNsdFallback()");
+        if (mainapp.appIsFinishing) {
+            Log.d(threaded_application.applicationName, activityName + ": startNsdFallback(): shutting down. do nothing");
+            return;
+        }
+        if (nsdManager == null) {
+            nsdManager = (NsdManager) mainapp.getSystemService(Context.NSD_SERVICE);
+        }
+
+        withrottleDiscoveryListener = new NsdDiscoveryListener(threaded_application.JMDNS_SERVICE_WITHROTTLE);
+        jmriDccexDiscoveryListener = new NsdDiscoveryListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP);
+        dccexTcpDiscoveryListener = new NsdDiscoveryListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP);
+        dccexUdpDiscoveryListener = new NsdDiscoveryListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP);
+
+        try {
+            Log.d(threaded_application.applicationName, activityName + ": startNsdFallback(): starting NsdManager discovery for WiThrottle, JMRI and DCC-EX...");
+            nsdManager.discoverServices(threaded_application.WT_TYPE, NsdManager.PROTOCOL_DNS_SD, withrottleDiscoveryListener);
+            nsdManager.discoverServices(threaded_application.JMRI_TYPE, NsdManager.PROTOCOL_DNS_SD, jmriDccexDiscoveryListener);
+            nsdManager.discoverServices(threaded_application.DCCEX_TCP_TYPE, NsdManager.PROTOCOL_DNS_SD, dccexTcpDiscoveryListener);
+            nsdManager.discoverServices(threaded_application.DCCEX_UDP_TYPE, NsdManager.PROTOCOL_DNS_SD, dccexUdpDiscoveryListener);
+        } catch (Exception e) {
+            Log.d(threaded_application.applicationName, activityName + ": startNsdFallback(): Exception starting NsdManager: " + e.getMessage());
         }
     }
 
+    void stopNsd() {
+        Log.d(threaded_application.applicationName, activityName + ": stopNsd()");
+
+        if (nsdManager != null) {
+            try {
+                if (withrottleDiscoveryListener != null) nsdManager.stopServiceDiscovery(withrottleDiscoveryListener);
+                if (jmriDccexDiscoveryListener != null) nsdManager.stopServiceDiscovery(jmriDccexDiscoveryListener);
+                if (dccexTcpDiscoveryListener != null) nsdManager.stopServiceDiscovery(dccexTcpDiscoveryListener);
+                if (dccexUdpDiscoveryListener != null) nsdManager.stopServiceDiscovery(dccexUdpDiscoveryListener);
+            } catch (Exception e) {
+                Log.d(threaded_application.applicationName, activityName + ": stopNsd(): Exception: " + e.getMessage());
+            }
+            withrottleDiscoveryListener = null;
+            jmriDccexDiscoveryListener = null;
+            dccexTcpDiscoveryListener = null;
+            dccexUdpDiscoveryListener = null;
+            nsdManager = null;
+        }
+
+        Log.d(threaded_application.applicationName, activityName + ": stopNsd(): end");
+    }
     //endJmdns() takes a long time, so put it in its own thread
     void endJmdns() {
+        Log.d(threaded_application.applicationName, activityName + ": endJmdns()");
+
+        stopNsd();
+        
         if (!jmdnsIsActive()) {      //only need to run one instance of this thread to terminate jmdns
             Log.d(threaded_application.applicationName, activityName + ": endJmdns(): not active");
             return;
@@ -201,10 +521,8 @@ public class comm_thread extends Thread {
 
         final JmDNS localJmdns = jmdns;
         final WithrottleListener localListener = listener;
-        final android.net.wifi.WifiManager.MulticastLock localLock = multicast_lock;
 
         jmdns = null; // Set to null immediately so a new one can be started if needed
-        multicast_lock = null;
         listener = null;
         endingJmdns = true;
 
@@ -212,17 +530,14 @@ public class comm_thread extends Thread {
             @Override
             public void run() {
                 try {
-                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: removing jmdns listener");
+                    Log.d(threaded_application.applicationName, activityName + ": unregistering all services and removing listeners");
+                    localJmdns.unregisterAllServices();
                     localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_WITHROTTLE, localListener);
                     localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, localListener);
                     localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_TCP, localListener);
                     localJmdns.removeServiceListener(threaded_application.JMDNS_SERVICE_DCC_EX_UDP, localListener);
-
-                    if (localLock != null && localLock.isHeld()) {
-                        localLock.release();
-                    }
                 } catch (Exception e) {
-                    Log.d(threaded_application.applicationName, activityName + ": endJmdns: exception in jmdns.removeServiceListener()");
+                    Log.d(threaded_application.applicationName, activityName + ": endJmdns:  exception in jmdns unregister/removeListener: " + e.getMessage());
                 }
                 try {
                     Log.d(threaded_application.applicationName, activityName + ": endJmdns: calling jmdns.close()");
@@ -231,19 +546,16 @@ public class comm_thread extends Thread {
                 } catch (Exception e) {
                     Log.d(threaded_application.applicationName, activityName + ": endJmdns: exception in jmdns.close()");
                 } finally {
+                    if (multicast_lock != null && multicast_lock.isHeld()) {
+                        multicast_lock.release();
+                    }
                     endingJmdns = false;
                 }
                 Log.d(threaded_application.applicationName, activityName + ": endJmdns run exit");
             }
         };
-        if (jmdnsIsActive()) {      //only need to run one instance of this thread to terminate jmdns
-            endingJmdns = true;
-            jmdnsThread.start();
-            Log.d(threaded_application.applicationName, activityName + ": endJmdns active so ending it and starting thread to remove listener");
-        } else {
-//            jmdnsThread = null;
-            Log.d(threaded_application.applicationName, activityName + ": endJmdns not active");
-        }
+        jmdnsThread.start();
+        Log.d(threaded_application.applicationName, activityName + ": endJmdns active so ending it and starting thread to remove listener");
     }
 
     boolean jmdnsIsActive() {
