@@ -995,6 +995,8 @@ public class SetDirectionButtonListener implements View.OnClickListener {
     }
 
     public void refreshDccexView() {
+        if (dccexWriteInfoLabel==null) return; // page not established yet
+
         dccexWriteInfoLabel.setText(dccexInfoStr);
         refreshDccexCommandsView();
     }

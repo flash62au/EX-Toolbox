@@ -690,7 +690,11 @@ public class RosterActivity extends AppCompatActivity implements GestureOverlayV
     // populate the on-screen roster view from global hashmap
     public void refresh_roster_list() {
         // clear and rebuild
-        roster_list.clear();
+        if (roster_list!=null)
+            roster_list.clear();
+        else
+            roster_list = new ArrayList<>();
+
         if (((mainapp.roster_entries != null)  // add roster and consist entries if any defined
                 && (mainapp.roster_entries.size() > 0))
                 || ((mainapp.consist_entries != null)

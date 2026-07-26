@@ -1241,6 +1241,8 @@ public class CvProgrammerActivity extends AppCompatActivity implements android.g
     }
 
     private void showHideButtons() {
+        if (dexcProgrammingCommonCvsLayout==null) return; // page not established yet
+
         if (dccExActionTypeIndex != TRACK_MANAGER) {
             dexcProgrammingCommonCvsLayout.setVisibility(View.VISIBLE);
             dccExCommonCvsSpinner.setVisibility(View.VISIBLE);
@@ -1306,6 +1308,8 @@ public class CvProgrammerActivity extends AppCompatActivity implements android.g
     }
 
     public void refreshDccexView() {
+        if (dccexWriteInfoLabel==null) return; // page not established yet
+
         try {
             etDccexWriteAddressValue.setText(dccexAddress);
             dccexWriteInfoLabel.setText(dccexInfoStr);
