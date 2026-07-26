@@ -75,6 +75,7 @@ class SocketUsb extends Thread {
         if (socketOk) {
             try {
                 mainapp.isUSB = true;
+                mainapp.isUdp = false;
 
                 Log.d("EX_Toolbox", "SocketUsb.connect(): List USB");
                 UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);

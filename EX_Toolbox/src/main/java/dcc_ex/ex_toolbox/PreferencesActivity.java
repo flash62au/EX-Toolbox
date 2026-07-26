@@ -246,6 +246,8 @@ public class PreferencesActivity extends AppCompatActivity implements Preference
         Log.d("EX_Toolbox", "PreferencesActivity: onResume()");
         super.onResume();
 
+        threaded_application.inBackgroundForImageOrPermission= false;
+
         Log.d("EX_Toolbox", "settings: onResume() called");
         try {
             dismissDialog(PROGRESS_BAR_TYPE);
@@ -601,6 +603,9 @@ public class PreferencesActivity extends AppCompatActivity implements Preference
 
     protected void loadImagefromGallery() {
         Log.d("EX_Toolbox", "PreferencesActivity: loadImagefromGallery()");
+
+        threaded_application.inBackgroundForImageOrPermission = true;
+
         // Create intent to Open Image applications like Gallery, Google Photos
         Intent galleryIntent = new Intent(Intent.ACTION_PICK,
                 android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
@@ -926,6 +931,8 @@ public class PreferencesActivity extends AppCompatActivity implements Preference
             Log.d("EX_Toolbox", "PreferencesActivity: SettingsFragment onResume()");
             super.onResume();
 
+            threaded_application.inBackgroundForImageOrPermission= false;
+
             getPreferenceScreen().getSharedPreferences()
                     .registerOnSharedPreferenceChangeListener(this);
 
@@ -1225,6 +1232,8 @@ public class PreferencesActivity extends AppCompatActivity implements Preference
         public void onResume() {
             Log.d("EX_Toolbox", "PreferencesActivity: SettingsFragment onResume()");
             super.onResume();
+
+            threaded_application.inBackgroundForImageOrPermission= false;
 
             getPreferenceScreen().getSharedPreferences()
                     .registerOnSharedPreferenceChangeListener(this);

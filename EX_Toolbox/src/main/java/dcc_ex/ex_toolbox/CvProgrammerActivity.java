@@ -174,7 +174,7 @@ public class CvProgrammerActivity extends AppCompatActivity implements android.g
     static final int TRACK_TYPE_DC_INDEX = 3;
     static final int TRACK_TYPE_DCX_INDEX = 4;
 
-    static final String[] TRACK_TYPES = {"NONE", "MAIN", "PROG", "DC", "DCX", "AUTO", "EXT", "PROG"};
+    static final String[] TRACK_TYPES = {"NONE", "MAIN", "PROG", "DC", "DCX", "AUTO", "EXT", "BOOST"};
     static final boolean[] TRACK_TYPES_NEED_ID = {false, false, false, true, true, false, false, false};
 //    static final boolean[] TRACK_TYPES_SELECTABLE = {true, true, true, true, true, true, false, false};
 

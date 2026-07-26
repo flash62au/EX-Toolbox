@@ -56,6 +56,7 @@ public class intro_activity extends AppIntro2 implements PermissionsHelper.Permi
         mainapp = (threaded_application) this.getApplication();
 
         mainapp.introIsRunning = true;
+//        threaded_application.inBackgroundForImageOrPermission = true;
 
         prefs = getSharedPreferences("dcc_ex.ex_toolbox_preferences", 0);
         originalPrefTheme = prefs.getString("prefTheme", getApplicationContext().getResources().getString(R.string.prefThemeDefaultValue));
@@ -227,6 +228,9 @@ public class intro_activity extends AppIntro2 implements PermissionsHelper.Permi
 //        showSkipButton(false);
 //        setProgressButtonEnabled(true);
 
+        // disable swiping
+        setSwipeLock(true);
+
         // Turn vibration on and set intensity.
         // NOTE: you will probably need to ask VIBRATE permission in Manifest.
         setVibrate(false);
@@ -306,6 +310,8 @@ public class intro_activity extends AppIntro2 implements PermissionsHelper.Permi
         Log.d("EX_Toolbox", "intro_activity.onDestroy() called");
 
         mainapp.introIsRunning = false;
+//        threaded_application.inBackgroundForImageOrPermission = false;
+
         if (!introComplete) {
             Toast.makeText(getApplicationContext(), getApplicationContext().getResources().getString(R.string.introbackButtonPress), Toast.LENGTH_LONG).show();
         }

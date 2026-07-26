@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Arduino Uno / Mega -->
-    <usb-device vendor-id="9025" />
-    <!-- FTDI -->
-    <usb-device vendor-id="1027" />
-    <!-- CP210x -->
-    <usb-device vendor-id="4292" />
-    <!-- CH340 / CH341 -->
-    <usb-device vendor-id="6790" />
-    <!-- PL2303 -->
-    <usb-device vendor-id="1659" />
-    <!-- Arduino Nano (old bootloader / clones) -->
-    <usb-device vendor-id="1a86" />
+    <!-- Arduino Uno / Mega (CDC ACM) -->
+    <usb-device vendor-id="9025" class="2" />
+    <!-- FTDI (Vendor Specific) -->
+    <usb-device vendor-id="1027" class="255" />
+    <!-- CP210x (Vendor Specific) -->
+    <usb-device vendor-id="4292" class="255" />
+    <!-- CH340 / CH341 (Vendor Specific) -->
+    <usb-device vendor-id="6790" class="255" />
+    <!-- PL2303 (Vendor Specific) -->
+    <usb-device vendor-id="1659" class="255" />
 </resources>

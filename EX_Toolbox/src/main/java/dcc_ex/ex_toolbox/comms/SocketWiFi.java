@@ -80,6 +80,7 @@ class SocketWiFi extends Thread {
         if (socketOk) {
             try {
                 mainapp.isUSB = false;
+                mainapp.isUdp = false;
 
                 //look for someone to answer on specified socket, and set timeout
                 Log.d("EX_Toolbox", "SocketWiFi.socketWifi: Opening socket, connectTimeout=" + connectTimeoutMs + " and socketTimeout=" + socketTimeoutMs);

@@ -22,7 +22,6 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Handler;
@@ -31,9 +30,12 @@ import android.util.Log;
 import android.webkit.WebView;
 import android.widget.Toast;
 
+import com.hoho.android.usbserial.driver.UsbSerialDriver;
+import com.hoho.android.usbserial.driver.UsbSerialProber;
+
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Objects;
 
 import dcc_ex.ex_toolbox.R;
@@ -84,22 +86,8 @@ public class comm_handler extends Handler {
                   if ((!mainapp.client_type.equals("WIFI")) && (mainapp.prefAllowMobileData)) {
                      threaded_application.safeToast(threaded_application.context.getResources().getString(R.string.toastThreadedAppNotWIFI, mainapp.client_type), Toast.LENGTH_LONG);
                   }
-                  if (commThread.jmdns == null) {   //start jmdns if not started
+                  if ( (commThread.jmdns == null) && (commThread.nsdManager == null) ) {   //start jmdns if not started
                      commThread.startJmdns();
-                     if (commThread.jmdns != null) {  //don't bother if jmdns didn't start
-                        try {
-                           commThread.multicast_lock.acquire();
-                        } catch (Exception e) {
-                           //log message, but keep going if this fails
-                           Log.d("EX_Toolbox", "comm_handler.handleMessage: multicast_lock.acquire() failed");
-                        }
-                        commThread.jmdns.addServiceListener(mainapp.JMDNS_SERVICE_WITHROTTLE, commThread.listener);
-//                        commThread.jmdns.addServiceListener("_dccex._tcp.local.", commThread.listener);
-                        commThread.jmdns.addServiceListener(mainapp.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP, commThread.listener);
-                        Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns listener added");
-                     } else {
-                        Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns not running, didn't start listener");
-                     }
                   } else {
                      Log.d("EX_Toolbox", "comm_handler.handleMessage: jmdns already running");
                   }
@@ -108,12 +96,14 @@ public class comm_handler extends Handler {
             break;
 
          //Connect to the WiThrottle server.
-         case message_type.CONNECT:
+         case message_type.CONNECT: {
 
-            //The IP address is stored in the obj as a String, the port is stored in arg1.
-            String new_host_ip = msg.obj.toString();
+            //The IP address, port and service type is stored in arg0.
+            String[] args = msg.obj.toString().split(" ");
+            String new_host_ip = args[0];
             new_host_ip = new_host_ip.trim();
-            int new_port = msg.arg1;
+            int new_port = Integer.parseInt(args[1]);
+            String new_serviceType = args[2];
 
             if (new_host_ip.equals("0.0.0.0")) { // USB OTG
 
@@ -146,6 +136,39 @@ public class comm_handler extends Handler {
                   mainapp.host_ip = null;  //clear vars if failed to connect
                   mainapp.port = 0;
                }
+
+            } else if (new_serviceType.equals(threaded_application.JMDNS_SERVICE_DCC_EX_UDP)) {
+
+               //avoid duplicate connects, seen when user clicks address multiple times quickly
+               if (comm_thread.socketUdp != null && comm_thread.socketUdp.SocketGood()
+                       && new_host_ip.equals(mainapp.host_ip) && new_port == mainapp.port) {
+                  Log.d("EX_Toolbox", "comm_handler.handleMessage: Duplicate CONNECT message received.");
+                  break;
+               }
+
+               //clear app.thread shared variables so they can be reinitialized
+               mainapp.initShared();
+               mainapp.fastClockSeconds = 0L;
+
+               //store ip and port in global variables
+               mainapp.host_ip = new_host_ip;
+               mainapp.port = new_port;
+               // skip url checking on Play Protect
+               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                  WebView.setSafeBrowsingWhitelist(Collections.singletonList(mainapp.host_ip), null);
+               }
+
+               //attempt connection to server
+               comm_thread.socketUdp = new SocketUdp(mainapp, prefs, commThread, mainapp.getBaseContext());
+               if (comm_thread.socketUdp.connect()) {
+
+                  commThread.sendThrottleName();
+                  mainapp.sendMsgDelay(mainapp.comm_msg_handler, 5000L, message_type.CONNECTION_COMPLETED_CHECK);
+               } else {
+                  mainapp.host_ip = null;  //clear vars if failed to connect
+                  mainapp.port = 0;
+               }
+
 
             } else {
 
@@ -182,11 +205,12 @@ public class comm_handler extends Handler {
             }
             break;
 
+         }
          //Release one or all locos on the specified throttle.  addr is in msg (""==all), arg1 holds whichThrottle.
          case message_type.RELEASE: {
             String addr = msg.obj.toString();
             final int whichThrottle = msg.arg1;
-            final boolean releaseAll = (addr.length() == 0);
+            final boolean releaseAll = (addr.isEmpty());
 
             if (releaseAll || mainapp.consists[whichThrottle].isEmpty()) {
                addr = "";
@@ -616,16 +640,16 @@ public class comm_handler extends Handler {
 
    public boolean areAnyUsbDevicesConnected() {
       UsbManager manager = (UsbManager) mainapp.getBaseContext().getSystemService(Context.USB_SERVICE);
-      HashMap<String, UsbDevice> deviceList = manager.getDeviceList();
+      List<UsbSerialDriver> availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager);
 
-      if (!deviceList.isEmpty()) {
-         for (UsbDevice device : deviceList.values()) {
-            // A USB device is connected
-            Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: Device Name: " + device.getDeviceName());
+      if (!availableDrivers.isEmpty()) {
+         for (UsbSerialDriver driver : availableDrivers) {
+            // A USB Serial device is connected
+            Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: Device Name: " + driver.getDevice().getDeviceName());
             return true;
          }
       } else {
-         Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: No USB devices connected.");
+         Log.d("EX_Toolbox", "SocketUsb.areAnyUsbDevicesConnected(): USB: No supported USB serial devices connected.");
       }
       return false;
    }

@@ -161,14 +161,9 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
     }
 
     private void connect() {
-//        navigateToHandler(PermissionsHelper.CONNECT_TO_SERVER);
-//    }
-//
 //    //Request connection to the server.
-//    private void connectImpl() {
-        //	  sendMsgErr(0, message_type.CONNECT, connected_hostip, connected_port, "ERROR in ca.connect: comm thread not started.");
         Log.d("EX_Toolbox", "in ConnectionActivity.connect()");
-        mainapp.sendMsg(mainapp.comm_msg_handler, message_type.CONNECT, connected_hostip, connected_port);
+        mainapp.sendMsg(mainapp.comm_msg_handler, message_type.CONNECT, connected_hostip+ " "+ connected_port + " " + connected_serviceType);
     }
 
 
@@ -224,7 +219,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
                         TextView hpv = (TextView) vg.getChildAt(2); // get port from 3rd box
                         connected_port = Integer.parseInt(hpv.getText().toString());
                         connected_ssid = mainapp.client_ssid;
-                        TextView hstv = (TextView) vg.getChildAt(3); // get from 4th box
+                        TextView hstv = (TextView) vg.getChildAt(4); // get from 5th box
                         connected_serviceType = hstv.getText().toString();
                         break;
                 }
@@ -302,7 +297,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
             connected_hostname = DUMMY_HOST;
             connected_port = DUMMY_PORT;
             connected_ssid = DUMMY_SSID;
-            connected_serviceType = mainapp.JMDNS_SERVICE_WITHROTTLE;
+            connected_serviceType = threaded_application.JMDNS_SERVICE_WITHROTTLE;
 
             Animation anim = AnimationUtils.loadAnimation(this, android.R.anim.slide_out_right);
             anim.setDuration(500);
@@ -376,15 +371,18 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
                     String found_ip_address = hm.get("ip_address");
                     String found_port = hm.get("port");
                     String found_service_type = hm.get("service_type");
+                    if ( (found_service_type!=null) && (!found_service_type.isEmpty()) && (found_service_type.charAt(0)=='.') ) found_service_type = found_service_type.substring(1);
+                    Log.d("EX_Toolbox", String.format("handleMessage(): serviceResolved: '%s'", found_service_type));
                     boolean entryExists = false;
 
                     //stop if new address is already in the list
                     HashMap<String, String> tm;
                     for (int index = 0; index < discovery_list.size(); index++) {
                         tm = discovery_list.get(index);
-//                        if (tm.get("host_name").equals(found_host_name)) {
-                        if ( (tm.get("ip_address").equals(found_ip_address))
-                                && (tm.get("port").equals(found_port)) ) {
+                        if ( (tm.get("host_name").equals(found_host_name))
+                                && (tm.get("ip_address").equals(found_ip_address))
+                                && (tm.get("port").equals(found_port))
+                                && (tm.get("service_type").equals(found_service_type)) ) {
                             entryExists = true;
                             break;
                         }
@@ -482,7 +480,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
         //Set up a list adapter to allow adding discovered servers to the UI.
         discovery_list = new ArrayList<>();
         discovery_list_adapter = new SimpleAdapter(this, discovery_list, R.layout.connections_list_item,
-                new String[]{"ip_address", "host_name", "port", "ssid", "serverType"},
+                new String[]{"ip_address", "host_name", "port", "ssid", "service_type"},
                 new int[]{R.id.ip_item_label, R.id.host_item_label, R.id.port_item_label, R.id.ssid_item_label, R.id.serverType_item_label});
         ListView discover_list = findViewById(R.id.discovery_list);
         discover_list.setAdapter(discovery_list_adapter);
@@ -492,7 +490,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
         //Set up a list adapter to allow adding the list of recent connections to the UI.
 //            connections_list = new ArrayList<>();
         connection_list_adapter = new SimpleAdapter(this, importExportConnectionList.connections_list, R.layout.connections_list_item,
-                new String[]{"ip_address", "host_name", "port", "ssid", "serverType"},
+                new String[]{"ip_address", "host_name", "port", "ssid", "service_type"},
                 new int[]{R.id.ip_item_label, R.id.host_item_label, R.id.port_item_label, R.id.ssid_item_label, R.id.serverType_item_label});
         ListView conn_list = findViewById(R.id.connections_list);
         conn_list.setAdapter(connection_list_adapter);
@@ -627,8 +625,7 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
         getWifiInfo();
 
         mainapp.setActivityOrientation(this);  //set screen orientation based on prefs
-        //start up server discovery listener
-        //	    sendMsgErr(0, message_type.SET_LISTENER, "", 1, "ERROR in ca.onResume: comm thread not started.") ;
+
         mainapp.sendMsg(mainapp.comm_msg_handler, message_type.SET_LISTENER, "", 1);
         //populate the ListView with the recent connections
         getConnectionsList();
@@ -637,10 +634,6 @@ public class ConnectionActivity extends AppCompatActivity implements Permissions
 
         set_labels();
         mainapp.cancelForcingFinish();            // if fresh start or restart after being killed in the bkg, indicate app is running again
-        //start up server discovery listener again (after a 1 second delay)
-        //TODO: this is a rig, figure out why this is needed for ubuntu servers
-        //	    sendMsgErr(1000, message_type.SET_LISTENER, "", 1, "ERROR in ca.onResume: comm thread not started.") ;
-        mainapp.sendMsg(mainapp.comm_msg_handler, message_type.SET_LISTENER, "", 1);
 
         if (prefs.getBoolean("connect_to_first_server_preference", false)) {
             connectA();

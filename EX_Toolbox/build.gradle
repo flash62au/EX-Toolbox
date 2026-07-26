@@ -8,6 +8,7 @@ android {
         applicationId "dcc_ex.ex_toolbox"
         minSdkVersion 21
         targetSdk 36
+        multiDexEnabled true
     }
 
     buildTypes {
@@ -22,6 +23,7 @@ android {
         }
     }
     compileOptions {
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
@@ -33,23 +35,19 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.preference:preference:1.2.1'
-    implementation 'androidx.annotation:annotation:1.9.1'
+    implementation 'androidx.annotation:annotation:1.10.0'
 
-//    implementation 'com.android.support:appcompat-v7:28.0.0'
-//    //noinspection GradleCompatible
-//    implementation 'com.android.support:preference-v7:28.0.0'
-//    //noinspection GradleCompatible
-//    implementation 'com.android.support:support-v4:28.0.0'
     implementation files('libs/autobahn-0.5.0.jar')
     implementation files('libs/jackson-core-asl-1.9.7.jar')
     implementation files('libs/jackson-mapper-asl-1.9.7.jar')
     implementation files('libs/java-json.jar')
-    implementation files('libs/jmdns-3.5.8.jar')
+    implementation 'org.jmdns:jmdns:3.6.3'
     implementation 'com.github.AppIntro:appintro:7.0.0-beta02'
-    implementation 'org.slf4j:slf4j-api:1.7.30'
-    implementation 'org.slf4j:slf4j-nop:1.7.30'
+    implementation 'org.slf4j:slf4j-api:2.0.18'
+    implementation 'org.slf4j:slf4j-nop:2.0.18'
     implementation 'com.github.mik3y:usb-serial-for-android:3.9.0'
 }
 

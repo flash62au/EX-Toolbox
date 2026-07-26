@@ -1,3 +1,20 @@
+**Version 0.1.40
+ * New Features
+ * Bug Fixes
+ * Other
+   * Added hint to the DC Address field.
+   * USB OTG improvements.
+   * Disable the background warning when using the image picker to choose a background image.
+**Version 0.1.39
+ * New Features
+   * Support UDP connection to CS
+ * Bug Fixes
+   * Ignore USB audio devices
+ * Other
+   * Removal of local copy of the jMDNS library so later versions will be used.
+   * AI suggested changes to the mDNS startup so that it immediately checks for services on app restart.
+   * Disabled left/right swipes in the intro/wizard.
+   * Disable the background warning when using the image picker to choose a background image.
 **Version 0.1.38
  * New Features
  * Bug Fixes

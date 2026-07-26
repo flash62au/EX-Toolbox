@@ -72,6 +72,7 @@ import androidx.core.app.NotificationCompat;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.Inet4Address;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -85,6 +86,7 @@ import java.util.TimeZone;
 import dcc_ex.ex_toolbox.type.Consist;
 import dcc_ex.ex_toolbox.type.message_type;
 import dcc_ex.ex_toolbox.import_export.ImportExport;
+import dcc_ex.ex_toolbox.type.notification_type;
 import dcc_ex.ex_toolbox.type.toolbar_button_size_to_use_type;
 import dcc_ex.ex_toolbox.type.toolbar_button_size_type;
 import dcc_ex.ex_toolbox.util.LocaleHelper;
@@ -97,6 +99,7 @@ import jmri.jmrit.roster.RosterEntry;
 //This thread will only act upon messages sent to it. The network communication needs to persist across activities, so that is why
 @SuppressLint("NewApi")
 public class threaded_application extends Application {
+    public static final String applicationName = "EX_Toolbox";
     public static String INTRO_VERSION = "10";  // set this to a different string to force the intro to run on next startup.
 
     private threaded_application mainapp = this;
@@ -111,8 +114,15 @@ public class threaded_application extends Application {
     public static int toolbarButtonCount = 0;
     private int initialToolbarHeight = -1;
 
-    public String JMDNS_SERVICE_WITHROTTLE = "_withrottle._tcp.local.";
-    public String JMDNS_SERVICE_JMRI_DCCPP_OVERTCP = "_dccppovertcpserver._tcp.local.";
+    public static final String JMDNS_SERVICE_WITHROTTLE = "_withrottle._tcp.local.";
+    public static final String JMDNS_SERVICE_JMRI_DCCPP_OVERTCP = "_dccppovertcpserver._tcp.local.";
+    public static final String JMDNS_SERVICE_DCC_EX_TCP = "_dcc-ex._tcp.local.";
+    public static final String JMDNS_SERVICE_DCC_EX_UDP = "_dcc-ex._udp.local.";
+    // NsdManager typically expects service type without the ".local." suffix and it is VERY picky about this.
+    public static final String WT_TYPE = "_withrottle._tcp";
+    public static final String JMRI_TYPE = "_dccppovertcpserver._tcp";
+    public static final String DCCEX_TCP_TYPE = "_dcc-ex._tcp";
+    public static final String DCCEX_UDP_TYPE = "_dcc-ex._udp";
 
     public volatile String host_ip = null; //The IP address of the WiThrottle server.
     public volatile String logged_host_ip = null;
@@ -187,6 +197,7 @@ public class threaded_application extends Application {
     public boolean isDccex = true;  // is a DCC-EX EX-CommandStation
     public boolean isEsp32OrCsb1 = false;
     public boolean isUSB = false;
+    public boolean isUdp = false;
     public String dccexVersion = "";
     public double dccexVersionValue = 0.0;
     public static final double DCCEX_MIN_VERSION_FOR_TRACK_MANAGER = 04.02007;
@@ -280,7 +291,15 @@ public class threaded_application extends Application {
     public static int min_fling_distance;           // pixel width needed for fling
     public static int min_fling_velocity;           // velocity needed for fling
 
-    private static final int ED_NOTIFICATION_ID = 416;  //no significance to 416, just shouldn't be 0
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - //
+    // notifications
+
+    int notificationLevel = 0; // no notification
+    NotificationManager notificationManager;
+    NotificationChannel notificationChannel;
+    NotificationCompat.Builder notificationCompatBuilder;
+    private Notification.Builder notificationBuilder;
+    private static final int NOTIFICATION_ID = 417;  //no significance to 417, just shouldn't be 0
 
     private SharedPreferences prefs;
 
@@ -302,6 +321,12 @@ public class threaded_application extends Application {
 
     private boolean exitConfirmed = false;
     private ApplicationLifecycleHandler lifecycleHandler;
+
+    public static boolean inBackgroundForImageOrPermission = false;
+
+    private static final String NOTIFICATION_CHANNEL_ID_HIGH = "ed_channel_HIGH";
+    private static final String NOTIFICATION_CHANNEL_ID_QUIET = "ed_channel_HIGH_quiet";
+
     public static Context context;
 
     public long exitDoubleBackButtonInitiated = 0;
@@ -403,68 +428,116 @@ public class threaded_application extends Application {
     /**
      * Display OnGoing Notification that indicates EX-Toolbox is Running.
      * Should only be called when ED is going into the background.
-     * Currently call this from each activity onPause, passing the current intent
+     * Currently, call this from each activity onPause, passing the current intent
      * to return to when reopening.
      */
-    private void addNotification(Intent notificationIntent) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            String CHANNEL_ID = "ed_channel_HIGH";// The id of the channel.
-            String CHANNEL_ID_QUIET = "ed_channel_HIGH_quiet";// The id of the channel without sound.
-            String channelId;
-            CharSequence name = this.getString(R.string.notification_title);// The user-visible name of the channel.
-            NotificationChannel mChannel;
+
+    // -----------------------------------------------------------------------------------------------------------------------------------
+    // Notifications
+
+    private void createNotificationChannelAndManager(Intent notificationIntent) {
+
+        if (notificationManager == null) {
+            if (notificationIntent == null) return;
+            // create it
+            notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+            if (Build.VERSION.SDK_INT >= 26) {
+                CharSequence name = this.getString(R.string.notificationInBackgroundTitle);// The user-visible name of the channel.
+
+                // Create High importance channel
+                NotificationChannel highChannel = new NotificationChannel(NOTIFICATION_CHANNEL_ID_HIGH, name, NotificationManager.IMPORTANCE_HIGH);
+                notificationManager.createNotificationChannel(highChannel);
+
+                // Create Low importance (quiet) channel
+                NotificationChannel quietChannel = new NotificationChannel(NOTIFICATION_CHANNEL_ID_QUIET, name, NotificationManager.IMPORTANCE_LOW);
+                quietChannel.setSound(null, null);
+                quietChannel.enableVibration(false);
+                notificationManager.createNotificationChannel(quietChannel);
+
+                boolean prefFeedbackWhenGoingToBackground = prefs.getBoolean("prefFeedbackWhenGoingToBackground", getResources().getBoolean(R.bool.prefFeedbackWhenGoingToBackgroundDefaultValue));
+                String channelId = prefFeedbackWhenGoingToBackground ? NOTIFICATION_CHANNEL_ID_HIGH : NOTIFICATION_CHANNEL_ID_QUIET;
+
+                PendingIntent contentIntent = PendingIntent.getActivity(this, NOTIFICATION_ID, notificationIntent,
+                        PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+                notificationBuilder = new Notification.Builder(getApplicationContext(), channelId);
+
+                notificationBuilder = notificationBuilder
+                        .setSmallIcon(R.drawable.icon_notification)
+                        .setContentTitle(this.getString(R.string.notificationInBackgroundTitle))
+                        .setContentText("")
+                        .setContentIntent(contentIntent)
+                        .setOngoing(true)
+                        .setOnlyAlertOnce(false);
+
+            } else {
+                //noinspection deprecation
+                notificationCompatBuilder =
+                        new NotificationCompat.Builder(this)
+                                .setSmallIcon(R.drawable.icon_notification)
+                                .setContentTitle(getResources().getString(R.string.notificationInBackgroundTitle))
+                                .setContentText("")
+                                .setOngoing(true)
+                                .setOnlyAlertOnce(false)
+                                .setPriority(NotificationManager.IMPORTANCE_HIGH);
+
+                PendingIntent contentIntent = PendingIntent.getActivity(this, NOTIFICATION_ID, notificationIntent,
+                        PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                notificationCompatBuilder.setContentIntent(contentIntent);
+            }
+        }
+    }
+
+    private void addNotification(Intent notificationIntent, int level) {
+//        if ( (isActivityVisible()) || (notificationLevel>0) ) return;
+        Log.d("EX_Toolbox", "t_a.addNotification()");
+        notificationLevel = level;
+        String notificationText = getResources().getString(R.string.notificationInBackgroundText);
+        if (level == 2) {
+            notificationText = getResources().getString(R.string.notificationInBackgroundTextLowMemory);
+        } else if (level == 3) {
+            notificationText = getResources().getString(R.string.notificationInBackgroundTextKilled);
+        }
+
+        if (!threaded_application.inBackgroundForImageOrPermission)
+            vibrate(new long[]{1000, 500, 1000, 500});
+        createNotificationChannelAndManager(notificationIntent);
+
+        if (Build.VERSION.SDK_INT >= 26) {
+            notificationBuilder.setContentText(notificationText);
 
             boolean prefFeedbackWhenGoingToBackground = prefs.getBoolean("prefFeedbackWhenGoingToBackground", getResources().getBoolean(R.bool.prefFeedbackWhenGoingToBackgroundDefaultValue));
-            if (prefFeedbackWhenGoingToBackground) {
-                channelId = CHANNEL_ID;
-                mChannel = new NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_HIGH);
-            } else {
-                channelId = CHANNEL_ID_QUIET;
-                mChannel = new NotificationChannel(CHANNEL_ID_QUIET, name, NotificationManager.IMPORTANCE_DEFAULT);
-                mChannel.setSound(null, null);
-            }
+            String channelId = (prefFeedbackWhenGoingToBackground && !inBackgroundForImageOrPermission) ? NOTIFICATION_CHANNEL_ID_HIGH : NOTIFICATION_CHANNEL_ID_QUIET;
+            notificationBuilder.setChannelId(channelId);
 
-            PendingIntent contentIntent = PendingIntent.getActivity(this, ED_NOTIFICATION_ID, notificationIntent,
+            PendingIntent contentIntent = PendingIntent.getActivity(this, NOTIFICATION_ID, notificationIntent,
                     PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            notificationBuilder.setContentIntent(contentIntent);
+            notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
 
-            Notification notification =
-                    new Notification.Builder(this)
-                            .setSmallIcon(R.drawable.icon_notification)
-                            .setContentTitle(this.getString(R.string.notification_title))
-                            .setContentText(this.getString(R.string.notification_text))
-                            .setContentIntent(contentIntent)
-                            .setOngoing(true)
-                            .setChannelId(channelId)
-                            .build();
-
-            // Add as notification
-            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            manager.createNotificationChannel(mChannel);
-            manager.notify(ED_NOTIFICATION_ID, notification);
         } else {
-            @SuppressLint("IconColors") NotificationCompat.Builder builder =
-                    new NotificationCompat.Builder(this)
-                            .setSmallIcon(R.drawable.icon)
-                            .setContentTitle(this.getString(R.string.notification_title))
-                            .setContentText(this.getString(R.string.notification_text))
-                            .setOngoing(true);
+            notificationCompatBuilder.setContentText(notificationText);
+            notificationCompatBuilder.setSilent(inBackgroundForImageOrPermission);
 
-            PendingIntent contentIntent = PendingIntent.getActivity(this, ED_NOTIFICATION_ID, notificationIntent,
+            PendingIntent contentIntent = PendingIntent.getActivity(this, NOTIFICATION_ID, notificationIntent,
                     PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            builder.setContentIntent(contentIntent);
-
-            // Add as notification
-            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            manager.notify(ED_NOTIFICATION_ID, builder.build());
-            safeToast(threaded_application.context.getResources().getString(R.string.notification_title), Toast.LENGTH_LONG);
+            notificationCompatBuilder.setContentIntent(contentIntent);
+            notificationManager.notify(NOTIFICATION_ID, notificationCompatBuilder.build());
         }
     }
 
     // Remove notification
-    private void removeNotification() {
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        manager.cancel(ED_NOTIFICATION_ID);
+    public void removeNotification(Intent notificationIntent) {
+        Log.d("EX_Toolbox", "t_a.removeNotification()");
+        if (notificationIntent == null) return;
+        notificationLevel = 0;
+        createNotificationChannelAndManager(notificationIntent);
+        notificationManager.cancel(NOTIFICATION_ID);
     }
+
+    // Notifications
+    // -----------------------------------------------------------------------------------------------------------------------------------
 
     @Override
     public void onCreate() {
@@ -515,7 +588,7 @@ public class threaded_application extends Application {
 
     public class ApplicationLifecycleHandler implements Application.ActivityLifecycleCallbacks, ComponentCallbacks2 {
         private boolean isInBackground = true;
-        private Activity runningActivity = null;
+        private WeakReference<Activity> runningActivityRef = new WeakReference<>(null);
 
         @Override
         public void onActivityCreated(@NonNull Activity activity, Bundle bundle) {
@@ -527,12 +600,19 @@ public class threaded_application extends Application {
 
         @Override
         public void onActivityResumed(@NonNull Activity activity) {
+            Log.d("EX_Toolbox", "t_a.ALO/ALH: onActivityResumed(): " + activity.getComponentName() + " : " + (isInBackground ? "Coming out of Background" : "foreground"));
             if (isInBackground) {                           // if coming out of background
                 isInBackground = false;
                 exitConfirmed = false;
-                removeNotification();
+                Activity runningActivity = runningActivityRef.get();
+                removeNotification((runningActivity != null) ? runningActivity.getIntent() : null);
+//
+//                if ( (!inBackgroundForImageOrPermission) && (wasInBackgroundWarningShownCount<3) )  // limit the number of times this toast warning is shown
+//                    threaded_application.showCustomToast(runningActivity, getApplicationContext().getResources().getString(R.string.toastWasInBackgroundTitle), Toast.LENGTH_LONG,3);
+
+                inBackgroundForImageOrPermission = false;
             }
-            runningActivity = activity;                 // save most recently resumed activity
+            runningActivityRef = new WeakReference<>(activity);
         }
 
         @Override
@@ -549,8 +629,9 @@ public class threaded_application extends Application {
 
         @Override
         public void onActivityDestroyed(@NonNull Activity activity) {
+            Activity runningActivity = runningActivityRef.get();
             if (isInBackground && activity == runningActivity) {
-                removeNotification();           // destroyed in background so remove notification
+                removeNotification(runningActivity.getIntent()); // destroyed in background so remove notification
             }
         }
 
@@ -562,23 +643,39 @@ public class threaded_application extends Application {
         public void onLowMemory() {
         }
 
+        @SuppressLint("ApplySharedPref")
         @Override
         public void onTrimMemory(int level) {
+            Log.d("EX_Toolbox", "t_a.ALO/ALH: onTrimMemory(): " + level);
             if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {   // if in background
-                if (!isInBackground) {                              // if just went into bkg
+                boolean isInMultiWindow = false;
+                Activity runningActivity = runningActivityRef.get();
+                if (Build.VERSION.SDK_INT >= 24) {
+                    isInMultiWindow = runningActivity != null && runningActivity.isInMultiWindowMode();
+                }
+
+                if (!isInMultiWindow && !isInBackground) {                              // if just went into bkg
                     isInBackground = true;
-                    if (!exitConfirmed) {                       // if user did not just confirm exit
-                        addNotification(runningActivity.getIntent());
-//                    } else {                                    // user confirmed exit
-                    }
+                    if (runningActivity != null)
+                        addNotification(runningActivity.getIntent(), notification_type.APP_PUSHED_TO_BACKGROUND);
+                    prefs.edit().putBoolean("prefForcedRestart", true).commit();
                 }
-                if (level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE) { // time to kill app
-                    if (!exitConfirmed) {       // if TA is running in bkg
-                        // disconnect and shutdown
-                        sendMsg(comm_msg_handler, message_type.DISCONNECT, "", 1);
-                        exitConfirmed = true;
+            }
+            if ( (level == ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
+                    || (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE) ) {
+                    Activity runningActivity = runningActivityRef.get();
+                    if (runningActivity != null) {
+                        removeNotification(runningActivity.getIntent());
+                        addNotification(runningActivity.getIntent(), notification_type.LOW_MEMORY);
                     }
-                }
+//                }
+            } else if ( (level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE)
+                    || (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) ){
+//                if (!isActivityVisible()) {   // double check it is in background
+                    // disconnect and shutdown
+                    safeToast(getResources().getString(R.string.notificationInBackgroundTextKilled),Toast.LENGTH_LONG);
+                    exitConfirmed = true;
+//                }
             }
         }
     }
@@ -766,6 +863,20 @@ public class threaded_application extends Application {
         if (getHostIp() != null) {
             s += "<small>, Protocol: </small>";
             s += "<b>DCC-EX</b>";
+
+            String transport;
+            if (!mainapp.isUSB) {
+                transport = switch (mainapp.connectedServiceType) {
+                case threaded_application.JMDNS_SERVICE_JMRI_DCCPP_OVERTCP -> "TCP (JMRI)";
+                case threaded_application.JMDNS_SERVICE_DCC_EX_UDP -> "UDP";
+//                case threaded_application.JMDNS_SERVICE_DCC_EX_TCP -> "TCP";
+                default -> "TCP";
+            };
+            } else {
+                transport = "USB";
+            }
+            s += "<small>, Transport: </small><b>" + transport + "</b>";
+
             s += String.format("<small>, Host: </small><b>%s</b>", getHostIp() );
             s += String.format("<small> Port: </small><b>%s</b>", connectedPort);
             //show server type and description if set
