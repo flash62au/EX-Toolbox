@@ -1423,6 +1423,8 @@ public class ServosActivity extends AppCompatActivity implements GestureOverlayV
     //********************************************************************
 
     public void refreshDccexView() {
+        if (dccexWriteInfoLabel==null) return; // page is not established yet
+
         dccexWriteInfoLabel.setText(dccexInfoStr);
         refreshDccexCommandsView();
         showHideButtons();

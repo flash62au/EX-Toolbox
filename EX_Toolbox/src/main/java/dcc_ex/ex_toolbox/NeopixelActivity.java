@@ -959,6 +959,8 @@ public class NeopixelActivity extends AppCompatActivity implements GestureOverla
     }
 
     public void refreshDccexView() {
+        if (dccexWriteInfoLabel==null) return; // page not established yet
+
         dccexWriteInfoLabel.setText(dccexInfoStr);
         refreshDccexCommandsView();
         showResult();

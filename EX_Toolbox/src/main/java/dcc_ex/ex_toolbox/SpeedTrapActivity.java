@@ -930,6 +930,8 @@ public class SpeedTrapActivity extends AppCompatActivity implements GestureOverl
     }
 
     public void refreshDccexView() {
+        if (dccexWriteInfoLabel==null) return; // page not established yet
+
         dccexWriteInfoLabel.setText(dccexInfoStr);
         try {
             etDccexStartPin.setText(startPinText);

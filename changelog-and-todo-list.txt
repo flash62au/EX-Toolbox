@@ -1,6 +1,8 @@
 **Version 0.1.40
  * New Features
  * Bug Fixes
+   * Fix a compatibility issue with Android 5.1.1 and the new version of jMDNS
+   * Address crashes reported to the play store
  * Other
    * Added hint to the DC Address field.
    * USB OTG improvements.

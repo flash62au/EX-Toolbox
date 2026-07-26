@@ -1021,6 +1021,8 @@ public class WifiActivity extends AppCompatActivity implements GestureOverlayVie
     }
 
     public void refreshDccexView() {
+        if (dccexWriteInfoLabel==null) return; // page not established yet
+
         dccexWriteInfoLabel.setText(dccexInfoStr);
         refreshDccexCommandsView();
         showResult();
