@@ -647,6 +647,9 @@ public class threaded_application extends Application {
         @Override
         public void onTrimMemory(int level) {
             Log.d("EX_Toolbox", "t_a.ALO/ALH: onTrimMemory(): " + level);
+            if (exitConfirmed) return;
+
+            Log.d("EX_Toolbox", "t_a.ALO/ALH: onTrimMemory(): " + level + " - Not Exiting");
             if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {   // if in background
                 boolean isInMultiWindow = false;
                 Activity runningActivity = runningActivityRef.get();
